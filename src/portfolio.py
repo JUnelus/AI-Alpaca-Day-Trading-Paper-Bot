@@ -41,6 +41,7 @@ class PortfolioState:
     starting_balance: float = STARTING_BALANCE
     account_equity: float = STARTING_BALANCE
     cash: float = STARTING_BALANCE
+    buying_power: float = STARTING_BALANCE
     positions: List[PositionSnapshot] = field(default_factory=list)
     total_pnl: float = 0.0
     total_pnl_pct: float = 0.0
@@ -122,6 +123,7 @@ def refresh_from_alpaca(
         starting_balance=STARTING_BALANCE,
         account_equity=equity,
         cash=account.cash,
+        buying_power=account.buying_power,
         positions=positions,
         total_pnl=total_pnl,
         total_pnl_pct=total_pnl_pct,

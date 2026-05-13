@@ -82,6 +82,9 @@ def run_once() -> dict:
     min_confidence = float(os.getenv("MIN_CONFIDENCE", str(config.get("min_confidence", 0.70))))
     max_risk_pct = float(os.getenv("MAX_RISK_PERCENT", "1"))
     max_pos_pct = config.get("max_position_pct", 15) / 100.0
+    min_buying_power_to_trade = float(
+        os.getenv("MIN_BUYING_POWER_TO_TRADE", str(config.get("min_buying_power_to_trade", 100.0)))
+    )
 
     alpaca = AlpacaClient()
     account = alpaca.get_account_snapshot()
@@ -109,12 +112,35 @@ def run_once() -> dict:
     # Use broker's actual buying_power (not gross cash) so the risk manager
     # rejects orders the broker would deny. Cap at portfolio_budget ($10k).
     available_cash = min(account.buying_power, portfolio_budget)
+    trading_paused_reason = ""
+    if available_cash < min_buying_power_to_trade:
+        trading_paused_reason = (
+            f"Insufficient buying power (${available_cash:.2f}) below minimum "
+            f"${min_buying_power_to_trade:.2f}; skipping order placement."
+        )
 
     for sym_cfg in symbols:
         sym = sym_cfg["symbol"]
         asset_type = sym_cfg["type"]
         snapshot = snapshots.get(sym)
         if not snapshot:
+            continue
+
+        if trading_paused_reason:
+            signal_map[sym] = {
+                "action": "hold",
+                "confidence": 0.0,
+                "last_price": snapshot.last_price,
+                "day_change_percent": snapshot.day_change_percent,
+            }
+            results.append(
+                {
+                    "symbol": sym,
+                    "decision": {"action": "hold", "confidence": 0.0},
+                    "risk": {"approved": False, "reasons": [trading_paused_reason]},
+                    "order_result": None,
+                }
+            )
             continue
 
         signal = generate_signal(snapshot)
@@ -189,6 +215,7 @@ def run_once() -> dict:
     else:
         state = PortfolioState.load()
         state.trades_today = trades_today_count
+        state.buying_power = account.buying_power
         state.last_updated = datetime.now(timezone.utc).isoformat()
 
     state.save()
@@ -204,6 +231,7 @@ def run_once() -> dict:
         "## 💰 Portfolio",
         f"- Equity: ${state.account_equity:,.2f}",
         f"- Cash:   ${state.cash:,.2f}",
+        f"- Buying power: ${state.buying_power:,.2f}",
         f"- P&L:    ${state.total_pnl:+,.2f} ({state.total_pnl_pct:+.2f}%)",
         f"- Trades executed today: {trades_today_count}",
         "",

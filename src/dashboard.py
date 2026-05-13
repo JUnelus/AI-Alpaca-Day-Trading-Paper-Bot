@@ -63,6 +63,7 @@ def generate_dashboard(
         f"| 🏦 Starting Balance  | `$10,000.00` |",
         f"| 💵 Current Equity    | `${state.account_equity:,.2f}` |",
         f"| 💸 Cash Available    | `${state.cash:,.2f}` |",
+        f"| 🧾 Buying Power      | `${state.buying_power:,.2f}` |",
         f"| {pnl_icon} Total P&L | `{_fmt_usd(state.total_pnl, sign=True)}` "
         f"&nbsp; `({_fmt_pct(state.total_pnl_pct)})` |",
         "",
