@@ -76,3 +76,10 @@
 2026-05-13T14:40:09.763847+00:00,META,hold,0.5,1.0,2.0,603.49,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
 2026-05-13T14:40:09.763936+00:00,SPY,hold,0.5,1.0,2.0,737.96,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
 2026-05-13T14:40:09.764028+00:00,ETH/USD,hold,0.5,1.0,0.6619,2266.15,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
+2026-05-13T21:45:42.967588+00:00,AAPL,buy,0.8761194029850741,1.0,5.0,295.88,True,Approved
+2026-05-13T21:45:43.056887+00:00,NVDA,buy,1.0,1.0,6.0,223.57,True,Approved
+2026-05-13T21:45:43.125484+00:00,TSLA,buy,1.0,1.0,3.0,440.82,True,Approved
+2026-05-13T21:45:43.192281+00:00,MSFT,sell,0.7255609780023053,1.0,3.0,409.26,True,Approved
+2026-05-13T21:45:43.258863+00:00,AMZN,buy,0.9242795876909189,1.0,5.0,267.43,True,Approved
+2026-05-13T21:45:43.324941+00:00,META,buy,1.0,1.0,2.0,610.46,True,Approved
+2026-05-13T21:45:43.392081+00:00,SPY,buy,0.7118968273320869,1.0,2.0,734.89,True,Approved
