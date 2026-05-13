@@ -3,8 +3,8 @@
   "account_equity": 100000.0,
   "cash": 100000.0,
   "positions": [],
-  "total_pnl": 90000.0,
-  "total_pnl_pct": 900.0,
-  "last_updated": "2026-05-13T03:57:53.565247+00:00",
+  "total_pnl": 0,
+  "total_pnl_pct": 0.0,
+  "last_updated": "2026-05-13T04:05:13.151887+00:00",
   "trades_today": 6
 }
