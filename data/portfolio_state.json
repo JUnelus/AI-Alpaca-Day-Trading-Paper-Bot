@@ -2,9 +2,10 @@
   "starting_balance": 10000.0,
   "account_equity": 100000.0,
   "cash": 100000.0,
+  "buying_power": 263.57,
   "positions": [],
   "total_pnl": 0,
   "total_pnl_pct": 0.0,
-  "last_updated": "2026-05-13T04:05:13.151887+00:00",
-  "trades_today": 6
+  "last_updated": "2026-05-13T04:15:27.332840+00:00",
+  "trades_today": 0
 }

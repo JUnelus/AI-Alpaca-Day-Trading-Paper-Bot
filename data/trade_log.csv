@@ -54,3 +54,10 @@
 2026-05-13T04:05:13.087454+00:00,BTC/USD,buy,0.7815946407526206,1.0,0.0185,80400.08,True,Approved
 2026-05-13T04:05:13.103919+00:00,ETH/USD,buy,0.854111233825167,1.0,0.6513,2280.08,True,Approved
 2026-05-13T04:05:13.117192+00:00,SOL/USD,buy,0.8606453115073678,1.0,15.6822,94.69,True,Approved
+2026-05-13T04:14:28.152230+00:00,AAPL,buy,0.7448681153478205,1.0,5.0,291.85,False,Rejected: no margin allowed; insufficient cash.
+2026-05-13T04:14:28.152526+00:00,NVDA,buy,0.7221290557783452,1.0,6.0,218.57,False,Rejected: no margin allowed; insufficient cash.
+2026-05-13T04:14:28.152750+00:00,META,buy,0.7382626991283434,1.0,2.0,596.97,False,Rejected: no margin allowed; insufficient cash.
+2026-05-13T04:14:28.152943+00:00,SPY,hold,0.5,1.0,2.0,738.18,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade. | Rejected: no margin allowed; insufficient cash.
+2026-05-13T04:14:28.153129+00:00,BTC/USD,buy,0.7702336376891821,1.0,0.0185,80354.82,False,Rejected: no margin allowed; insufficient cash.
+2026-05-13T04:14:28.153312+00:00,ETH/USD,buy,0.8350352561678516,1.0,0.6519,2277.93,False,Rejected: no margin allowed; insufficient cash.
+2026-05-13T04:14:28.153482+00:00,SOL/USD,buy,0.8458708210685009,1.0,15.6936,94.62,False,Rejected: no margin allowed; insufficient cash.
