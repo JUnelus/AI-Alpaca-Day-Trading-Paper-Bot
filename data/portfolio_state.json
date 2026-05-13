@@ -1,11 +1,72 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 100000.0,
-  "cash": 100000.0,
-  "buying_power": 263.57,
-  "positions": [],
-  "total_pnl": 0,
-  "total_pnl_pct": 0.0,
-  "last_updated": "2026-05-13T04:27:19.028441+00:00",
-  "trades_today": 0
+  "account_equity": 99580.1,
+  "cash": 64245.7,
+  "buying_power": 12954.89,
+  "positions": [
+    {
+      "symbol": "AAPL",
+      "asset_type": "stock",
+      "qty": 162.0,
+      "avg_entry_price": 294.914877,
+      "current_price": 295.55,
+      "market_value": 47879.1,
+      "unrealized_pnl": 102.889926,
+      "unrealized_pnl_pct": 0.21535807432325635
+    },
+    {
+      "symbol": "AMZN",
+      "asset_type": "stock",
+      "qty": -56.0,
+      "avg_entry_price": 263.788215,
+      "current_price": 264.865,
+      "market_value": -14832.44,
+      "unrealized_pnl": -60.29996,
+      "unrealized_pnl_pct": 0.40820057105280466
+    },
+    {
+      "symbol": "META",
+      "asset_type": "stock",
+      "qty": 50.0,
+      "avg_entry_price": 599.898201,
+      "current_price": 603.44,
+      "market_value": 30172.0,
+      "unrealized_pnl": 177.08995,
+      "unrealized_pnl_pct": 0.5904000035499356
+    },
+    {
+      "symbol": "MSFT",
+      "asset_type": "stock",
+      "qty": -72.0,
+      "avg_entry_price": 403.03625,
+      "current_price": 402.32,
+      "market_value": -28967.04,
+      "unrealized_pnl": 51.57,
+      "unrealized_pnl_pct": -0.17771354313662854
+    },
+    {
+      "symbol": "NVDA",
+      "asset_type": "stock",
+      "qty": 140.0,
+      "avg_entry_price": 225.453429,
+      "current_price": 224.455,
+      "market_value": 31423.7,
+      "unrealized_pnl": -139.78006,
+      "unrealized_pnl_pct": -0.4428537655996352
+    },
+    {
+      "symbol": "TSLA",
+      "asset_type": "stock",
+      "qty": -68.0,
+      "avg_entry_price": 438.081617,
+      "current_price": 446.19,
+      "market_value": -30340.92,
+      "unrealized_pnl": -551.370044,
+      "unrealized_pnl_pct": 1.850884101352283
+    }
+  ],
+  "total_pnl": -419.900188,
+  "total_pnl_pct": -4.19900188,
+  "last_updated": "2026-05-13T14:40:09.847573+00:00",
+  "trades_today": 3
 }
