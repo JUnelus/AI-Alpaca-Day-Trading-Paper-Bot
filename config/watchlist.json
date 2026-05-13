@@ -1,0 +1,18 @@
+{
+  "portfolio_size": 10000,
+  "max_position_pct": 15,
+  "min_confidence": 0.70,
+  "symbols": [
+    {"symbol": "AAPL",    "name": "Apple Inc.",           "type": "stock"},
+    {"symbol": "NVDA",    "name": "NVIDIA Corp.",          "type": "stock"},
+    {"symbol": "TSLA",    "name": "Tesla Inc.",            "type": "stock"},
+    {"symbol": "MSFT",    "name": "Microsoft Corp.",       "type": "stock"},
+    {"symbol": "AMZN",    "name": "Amazon.com Inc.",       "type": "stock"},
+    {"symbol": "META",    "name": "Meta Platforms Inc.",   "type": "stock"},
+    {"symbol": "SPY",     "name": "SPDR S&P 500 ETF",     "type": "etf"},
+    {"symbol": "BTC/USD", "name": "Bitcoin",               "type": "crypto"},
+    {"symbol": "ETH/USD", "name": "Ethereum",              "type": "crypto"},
+    {"symbol": "SOL/USD", "name": "Solana",                "type": "crypto"}
+  ]
+}
+

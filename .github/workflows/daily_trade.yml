@@ -1,0 +1,61 @@
+name: 🤖 Daily Trading Bot
+
+on:
+  push:
+  schedule:
+    # 9:45 AM ET Mon–Fri — place day orders at market open
+    - cron: '45 13 * * 1-5'
+    # 4:15 PM ET Mon–Fri — update portfolio & dashboard after close
+    - cron: '15 21 * * 1-5'
+  workflow_dispatch:   # allows manual trigger from the Actions tab
+
+permissions:
+  contents: write       # needed to push README + data files back to repo
+
+jobs:
+  trade-and-dashboard:
+    name: Run Bot & Refresh Dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── checkout ────────────────────────────────────────────────────────────
+      - name: ⬇️  Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── python ──────────────────────────────────────────────────────────────
+      - name: 🐍  Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 📦  Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── bot ─────────────────────────────────────────────────────────────────
+      - name: 🚀  Run trading bot
+        env:
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER:      'true'
+          MIN_CONFIDENCE:    '0.70'
+          MAX_RISK_PERCENT:  '1'
+        run: python -m src.main
+
+      # ── commit back ─────────────────────────────────────────────────────────
+      - name: 📊  Commit updated dashboard & portfolio state
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name  "github-actions[bot]"
+          git add \
+            README.md \
+            data/portfolio_state.json \
+            data/trade_log.csv \
+            reports/daily_summary.md
+          git diff --staged --quiet \
+            || git commit -m "📊 [bot] Portfolio dashboard — $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
+
