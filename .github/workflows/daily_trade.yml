@@ -12,6 +12,11 @@ on:
 permissions:
   contents: write       # needed to push README + data files back to repo
 
+# Opt into Node.js 24 now — Node.js 20 actions are deprecated and will be
+# removed from runners on 2026-09-16 (forced default from 2026-06-02).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   trade-and-dashboard:
     name: Run Bot & Refresh Dashboard

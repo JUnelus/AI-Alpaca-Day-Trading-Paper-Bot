@@ -106,8 +106,9 @@ def run_once() -> dict:
 
     results = []
     signal_map: Dict[str, dict] = {}
-    # Track remaining budget locally so each trade deducts from what's left
-    available_cash = min(account.cash, portfolio_budget)
+    # Use broker's actual buying_power (not gross cash) so the risk manager
+    # rejects orders the broker would deny. Cap at portfolio_budget ($10k).
+    available_cash = min(account.buying_power, portfolio_budget)
 
     for sym_cfg in symbols:
         sym = sym_cfg["symbol"]
@@ -171,7 +172,13 @@ def run_once() -> dict:
             }
         )
 
-    trades_today_count = sum(1 for r in results if r["risk"]["approved"])
+    trades_today_count = sum(
+        1 for r in results
+        if r["risk"]["approved"]
+        and r.get("order_result")
+        and "error" not in str(r.get("order_result", ""))
+        and "skipped" not in str(r.get("order_result", ""))
+    )
 
     # ── portfolio state ────────────────────────────────────────────────────────
     symbol_type_map = {s["symbol"]: s["type"] for s in symbols}

@@ -17,6 +17,7 @@ except Exception:  # pragma: no cover - import guarded for local runs without de
 class AccountSnapshot:
     equity: float
     cash: float
+    buying_power: float = 0.0  # actual available buying power — may differ from cash
 
 
 class AlpacaClient:
@@ -36,10 +37,14 @@ class AlpacaClient:
     def get_account_snapshot(self) -> AccountSnapshot:
         if not self._client:
             # Safe fallback for local dry runs.
-            return AccountSnapshot(equity=100000.0, cash=100000.0)
+            return AccountSnapshot(equity=100000.0, cash=100000.0, buying_power=100000.0)
 
         account = self._client.get_account()
-        return AccountSnapshot(equity=float(account.equity), cash=float(account.cash))
+        return AccountSnapshot(
+            equity=float(account.equity),
+            cash=float(account.cash),
+            buying_power=float(account.buying_power),
+        )
 
     def list_positions(self) -> list:
         if not self._client:
