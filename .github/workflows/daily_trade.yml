@@ -20,6 +20,7 @@ env:
 jobs:
   trade-and-dashboard:
     name: Run Bot & Refresh Dashboard
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
