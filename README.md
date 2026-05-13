@@ -95,7 +95,7 @@ python -m src.main                   # run one full cycle
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-05-13 04:05 UTC &nbsp;|&nbsp; **Trades today:** 6 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-05-13 04:09 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -123,9 +123,9 @@ python -m src.main                   # run one full cycle
 | 5 | **AMZN** | Amazon.com Inc. | STOCK | $265.82 | 🔴 -1.18% | HOLD | — |
 | 6 | **META** | Meta Platforms Inc. | STOCK | $603.00 | 🟢 +0.69% | **BUY** | 74% |
 | 7 | **SPY** | SPDR S&P 500 ETF | ETF | $738.18 | 🔴 -0.15% | HOLD | — |
-| 8 | **BTC/USD** | Bitcoin | CRYPTO | $81,212.20 | 🟢 +0.91% | **BUY** | 78% |
-| 9 | **ETH/USD** | Ethereum | CRYPTO | $2,303.11 | 🟢 +1.27% | **BUY** | 85% |
-| 10 | **SOL/USD** | Solana | CRYPTO | $95.65 | 🟢 +1.30% | **BUY** | 86% |
+| 8 | **BTC/USD** | Bitcoin | CRYPTO | $81,170.82 | 🟢 +0.86% | **BUY** | 77% |
+| 9 | **ETH/USD** | Ethereum | CRYPTO | $2,301.31 | 🟢 +1.19% | **BUY** | 84% |
+| 10 | **SOL/USD** | Solana | CRYPTO | $95.60 | 🟢 +1.25% | **BUY** | 85% |
 
 ---
 
