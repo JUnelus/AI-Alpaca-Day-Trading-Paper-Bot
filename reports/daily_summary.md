@@ -8,13 +8,13 @@
 - Trades executed today: 0
 
 ## 🤖 AI Decisions
-- **AAPL** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **NVDA** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **TSLA** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **MSFT** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **AMZN** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **META** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **SPY** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **BTC/USD** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **ETH/USD** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
-- **SOL/USD** — HOLD (conf=0.00) → ❌ REJECTED: Insufficient buying power ($263.57) below minimum $20000.00; skipping order placement.
+- **AAPL** — BUY (conf=0.74) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
+- **NVDA** — BUY (conf=0.72) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
+- **TSLA** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell
+- **MSFT** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell
+- **AMZN** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell
+- **META** — BUY (conf=0.74) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
+- **SPY** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: no margin allowed; insufficient cash.
+- **BTC/USD** — BUY (conf=0.77) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
+- **ETH/USD** — BUY (conf=0.83) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
+- **SOL/USD** — BUY (conf=0.84) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
