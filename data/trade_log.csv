@@ -93,3 +93,10 @@
 2026-05-14T02:47:50.416499+00:00,BTC/USD,hold,0.5,1.0,0.0189,79530.75,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade. | Rejected: no margin allowed; insufficient cash.
 2026-05-14T02:47:50.416585+00:00,ETH/USD,hold,0.5,1.0,0.6639,2259.44,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade. | Rejected: no margin allowed; insufficient cash.
 2026-05-14T02:47:50.416665+00:00,SOL/USD,hold,0.5,1.0,16.4881,90.97,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade. | Rejected: no margin allowed; insufficient cash.
+2026-05-14T03:13:58.279457+00:00,AAPL,buy,0.8761194029850741,1.0,5.0,295.88,True,Approved
+2026-05-14T03:13:58.341296+00:00,NVDA,buy,1.0,1.0,6.0,223.57,True,Approved
+2026-05-14T03:13:58.375569+00:00,TSLA,buy,1.0,1.0,3.0,440.82,False,Rejected: no margin allowed; insufficient cash.
+2026-05-14T03:13:58.375673+00:00,AMZN,buy,0.9242795876909189,1.0,5.0,267.43,False,Rejected: no margin allowed; insufficient cash.
+2026-05-14T03:13:58.375747+00:00,META,buy,1.0,1.0,2.0,610.46,False,Rejected: no margin allowed; insufficient cash.
+2026-05-14T03:13:58.375809+00:00,SPY,buy,0.7118968273320869,1.0,2.0,734.89,False,Rejected: no margin allowed; insufficient cash.
+2026-05-14T03:13:58.375876+00:00,BTC/USD,hold,0.5,1.0,0.0189,79257.3,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade. | Rejected: no margin allowed; insufficient cash.

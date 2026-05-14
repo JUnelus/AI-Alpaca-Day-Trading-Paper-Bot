@@ -1,74 +1,74 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 100845.12,
+  "account_equity": 100794.36,
   "cash": 62766.97,
-  "buying_power": 3836.88,
+  "buying_power": 818.07,
   "positions": [
     {
       "symbol": "AAPL",
       "asset_type": "stock",
       "qty": 162.0,
       "avg_entry_price": 294.914877,
-      "current_price": 298.66,
-      "market_value": 48382.92,
-      "unrealized_pnl": 606.709926,
-      "unrealized_pnl_pct": 1.2698996531124471
+      "current_price": 298.71,
+      "market_value": 48391.02,
+      "unrealized_pnl": 614.809926,
+      "unrealized_pnl_pct": 1.2868536977875147
     },
     {
       "symbol": "AMZN",
       "asset_type": "stock",
       "qty": -56.0,
       "avg_entry_price": 263.788215,
-      "current_price": 270.5,
-      "market_value": -15148.0,
-      "unrealized_pnl": -375.85996,
-      "unrealized_pnl_pct": 2.544383948312475
+      "current_price": 270.39,
+      "market_value": -15141.84,
+      "unrealized_pnl": -369.69996,
+      "unrealized_pnl_pct": 2.5026838291468025
     },
     {
       "symbol": "META",
       "asset_type": "stock",
       "qty": 50.0,
       "avg_entry_price": 599.898201,
-      "current_price": 616.31,
-      "market_value": 30815.5,
-      "unrealized_pnl": 820.58995,
-      "unrealized_pnl_pct": 2.7357639967318392
+      "current_price": 615.55,
+      "market_value": 30777.5,
+      "unrealized_pnl": 782.58995,
+      "unrealized_pnl_pct": 2.6090758355183
     },
     {
       "symbol": "MSFT",
       "asset_type": "stock",
       "qty": -75.0,
       "avg_entry_price": 403.0068,
-      "current_price": 403.69,
-      "market_value": -30276.75,
-      "unrealized_pnl": -51.24,
-      "unrealized_pnl_pct": 0.16952567549728692
+      "current_price": 403.9,
+      "market_value": -30292.5,
+      "unrealized_pnl": -66.99,
+      "unrealized_pnl_pct": 0.22163397739194476
     },
     {
       "symbol": "NVDA",
       "asset_type": "stock",
       "qty": 146.0,
       "avg_entry_price": 225.413425,
-      "current_price": 228.08,
-      "market_value": 33299.68,
-      "unrealized_pnl": 389.31995,
-      "unrealized_pnl_pct": 1.1829708013176237
+      "current_price": 228.31,
+      "market_value": 33333.26,
+      "unrealized_pnl": 422.89995,
+      "unrealized_pnl_pct": 1.2850055403754235
     },
     {
       "symbol": "TSLA",
       "asset_type": "stock",
       "qty": -65.0,
       "avg_entry_price": 438.081617,
-      "current_price": 446.08,
-      "market_value": -28995.2,
-      "unrealized_pnl": -519.894895,
-      "unrealized_pnl_pct": 1.8257746250055502
+      "current_price": 446.77,
+      "market_value": -29040.05,
+      "unrealized_pnl": -564.744895,
+      "unrealized_pnl_pct": 1.983279522089602
     }
   ],
-  "total_pnl": 869.6249710000001,
-  "total_pnl_pct": 8.69624971,
+  "total_pnl": 818.8649710000001,
+  "total_pnl_pct": 8.188649710000002,
   "yesterday_total_pnl": 532.372471,
   "yesterday_equity": 100507.87,
-  "last_updated": "2026-05-14T02:47:50.434328+00:00",
-  "trades_today": 5
+  "last_updated": "2026-05-14T03:13:58.395187+00:00",
+  "trades_today": 2
 }
