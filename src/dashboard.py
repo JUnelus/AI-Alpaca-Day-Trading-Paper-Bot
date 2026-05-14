@@ -174,6 +174,36 @@ def generate_dashboard(
         "",
         "---",
         "",
+        "### 🔮 Tomorrow's Predictions",
+        "",
+        "> _Momentum-based forecast only — not financial advice. "
+        "Moderate moves predict continuation; extreme moves (>2.5%) suggest mean reversion._",
+        "",
+        "| # | Symbol | Name | Predicted Action | Confidence | Basis |",
+        "|--:|:-------|:-----|:----------------:|-----------:|:------|",
+    ]
+    for i, sym_cfg in enumerate(watchlist, 1):
+        sym = sym_cfg["symbol"]
+        sig = (signal_map or {}).get(sym)
+        pred = (sig or {}).get("prediction") if sig else None
+        if pred:
+            p_act = str(pred.get("predicted_action", "HOLD"))
+            p_conf = float(pred.get("predicted_confidence", 0.5))
+            p_basis = str(pred.get("basis", "—"))
+            act_fmt = f"**{p_act}**" if p_act != "HOLD" else "HOLD"
+            conf_fmt = f"{p_conf:.0%}"
+        else:
+            act_fmt = "—"
+            conf_fmt = "—"
+            p_basis = "—"
+        lines.append(
+            f"| {i} | **{sym}** | {sym_cfg['name']} | {act_fmt} | {conf_fmt} | {p_basis} |"
+        )
+
+    lines += [
+        "",
+        "---",
+        "",
         "_Dashboard auto-updated by "
         "[GitHub Actions](.github/workflows/daily_trade.yml) · "
         "Runs Mon–Fri at 9:45 AM ET & 4:15 PM ET_",

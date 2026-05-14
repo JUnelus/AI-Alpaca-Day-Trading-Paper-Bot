@@ -17,7 +17,7 @@ from .logger import log_ai_decision, write_daily_summary
 from .market_data import get_market_snapshots
 from .portfolio import PortfolioState, STATE_FILE, refresh_from_alpaca
 from .risk_manager import RiskManager
-from .strategy import generate_signal
+from .strategy import generate_signal, predict_next_day
 
 # ── paths ──────────────────────────────────────────────────────────────────────
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -136,6 +136,10 @@ def run_once() -> dict:
                 "confidence": 0.0,
                 "last_price": snapshot.last_price,
                 "day_change_percent": snapshot.day_change_percent,
+                "prediction": predict_next_day(
+                    snapshot,
+                    generate_signal(snapshot),
+                ),
             }
             results.append(
                 {
@@ -155,19 +159,19 @@ def run_once() -> dict:
             if held_qty == 0.0:
                 # No position at all — nothing to sell or short
                 rejection_reason = "No position to sell."
-                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent}
+                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent, "prediction": predict_next_day(snapshot, signal)}
                 results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": [rejection_reason]}, "order_result": None})
                 continue
             if not allow_shorts and held_qty < 0:
                 # Long-only mode: already short, don't deepen the short
                 rejection_reason = "Long-only mode: cannot add to an existing short position."
-                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent}
+                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent, "prediction": predict_next_day(snapshot, signal)}
                 results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": [rejection_reason]}, "order_result": None})
                 continue
             if not allow_shorts and held_qty == 0.0:
                 # Long-only mode: no position, sell would open a new short — block it
                 rejection_reason = "Long-only mode: SELL blocked — would open a new short position."
-                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent}
+                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent, "prediction": predict_next_day(snapshot, signal)}
                 results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": [rejection_reason]}, "order_result": None})
                 continue
             # held_qty > 0 → long position exists; allow sell-to-close
@@ -202,6 +206,7 @@ def run_once() -> dict:
             "confidence": decision["confidence"],
             "last_price": snapshot.last_price,
             "day_change_percent": snapshot.day_change_percent,
+            "prediction": predict_next_day(snapshot, signal),
         }
 
         results.append(
