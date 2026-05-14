@@ -1,34 +1,64 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 102001.17,
-  "cash": 57643.6,
-  "buying_power": 152752.04,
+  "account_equity": 102293.55,
+  "cash": 47717.48,
+  "buying_power": 139763.42,
   "positions": [
+    {
+      "symbol": "BTC/USD",
+      "asset_type": "crypto",
+      "qty": 0.01865325,
+      "avg_entry_price": 80193.0,
+      "current_price": 81455.77,
+      "market_value": 1519.414842,
+      "unrealized_pnl": 23.554765,
+      "unrealized_pnl_pct": 1.5746636572655415
+    },
+    {
+      "symbol": "META",
+      "asset_type": "stock",
+      "qty": 2.0,
+      "avg_entry_price": 620.18,
+      "current_price": 617.18,
+      "market_value": 1234.36,
+      "unrealized_pnl": -6.0,
+      "unrealized_pnl_pct": -0.4837305298461737
+    },
+    {
+      "symbol": "MSFT",
+      "asset_type": "stock",
+      "qty": 3.0,
+      "avg_entry_price": 407.74,
+      "current_price": 408.0,
+      "market_value": 1224.0,
+      "unrealized_pnl": 0.78,
+      "unrealized_pnl_pct": 0.06376612547211459
+    },
     {
       "symbol": "NVDA",
       "asset_type": "stock",
-      "qty": 170.0,
-      "avg_entry_price": 226.228,
-      "current_price": 234.3698,
-      "market_value": 39842.866,
-      "unrealized_pnl": 1384.106,
-      "unrealized_pnl_pct": 3.598935587106812
+      "qty": 176.0,
+      "avg_entry_price": 226.510114,
+      "current_price": 235.9,
+      "market_value": 41518.4,
+      "unrealized_pnl": 1652.619936,
+      "unrealized_pnl_pct": 4.145459924142726
     },
     {
       "symbol": "SPY",
       "asset_type": "etf",
-      "qty": 4.0,
-      "avg_entry_price": 744.3625,
-      "current_price": 746.14,
-      "market_value": 2984.56,
-      "unrealized_pnl": 7.11,
-      "unrealized_pnl_pct": 0.23879494198055387
+      "qty": 6.0,
+      "avg_entry_price": 744.966667,
+      "current_price": 747.7,
+      "market_value": 4486.2,
+      "unrealized_pnl": 16.399998,
+      "unrealized_pnl_pct": 0.3669067518157829
     }
   ],
-  "total_pnl": 1391.216,
-  "total_pnl_pct": 13.912159999999998,
+  "total_pnl": 1687.354699,
+  "total_pnl_pct": 16.873546989999998,
   "yesterday_total_pnl": 532.372471,
   "yesterday_equity": 100507.87,
-  "last_updated": "2026-05-14T14:36:34.441935+00:00",
-  "trades_today": 5
+  "last_updated": "2026-05-14T21:40:45.206533+00:00",
+  "trades_today": 6
 }
