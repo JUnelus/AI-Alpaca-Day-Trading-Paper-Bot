@@ -5,7 +5,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Dict, List, TYPE_CHECKING
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .alpaca_client import AlpacaClient
@@ -45,6 +45,8 @@ class PortfolioState:
     positions: List[PositionSnapshot] = field(default_factory=list)
     total_pnl: float = 0.0
     total_pnl_pct: float = 0.0
+    yesterday_total_pnl: Optional[float] = None
+    yesterday_equity: Optional[float] = None
     last_updated: str = ""
     trades_today: int = 0
 

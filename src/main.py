@@ -86,6 +86,8 @@ def run_once() -> dict:
         os.getenv("MIN_BUYING_POWER_TO_TRADE", str(config.get("min_buying_power_to_trade", 100.0)))
     )
 
+    previous_state = PortfolioState.load()
+
     alpaca = AlpacaClient()
     account = alpaca.get_account_snapshot()
 
@@ -218,10 +220,25 @@ def run_once() -> dict:
         state.buying_power = account.buying_power
         state.last_updated = datetime.now(timezone.utc).isoformat()
 
+    today = date.today()
+    previous_date = None
+    if previous_state.last_updated:
+        try:
+            previous_date = datetime.fromisoformat(previous_state.last_updated).date()
+        except ValueError:
+            previous_date = None
+
+    if previous_date is not None and previous_date < today:
+        state.yesterday_total_pnl = previous_state.total_pnl
+        state.yesterday_equity = previous_state.account_equity
+    else:
+        state.yesterday_total_pnl = previous_state.yesterday_total_pnl
+        state.yesterday_equity = previous_state.yesterday_equity
+
     state.save()
 
     # ── update README dashboard ────────────────────────────────────────────────
-    dashboard_md = generate_dashboard(state, symbols, signal_map)
+    dashboard_md = generate_dashboard(state, symbols, signal_map, results)
     update_readme(dashboard_md)
 
     # ── daily summary report ───────────────────────────────────────────────────

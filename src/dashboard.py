@@ -41,6 +41,7 @@ def generate_dashboard(
     state: PortfolioState,
     watchlist: List[dict],
     signal_map: Optional[Dict[str, dict]] = None,
+    run_results: Optional[List[dict]] = None,
 ) -> str:
     """Return the markdown content that sits between the two marker comments."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -68,6 +69,52 @@ def generate_dashboard(
         f"&nbsp; `({_fmt_pct(state.total_pnl_pct)})` |",
         "",
     ]
+
+    # ── written summary ─────────────────────────────────────────────────────────
+    day_pnl = None
+    if state.yesterday_total_pnl is not None:
+        day_pnl = state.total_pnl - state.yesterday_total_pnl
+
+    lines += [
+        "### 📝 Daily Trade Summary",
+        "",
+        f"- **Startup-to-date Total P&L:** `{_fmt_usd(state.total_pnl, sign=True)}` ({_fmt_pct(state.total_pnl_pct)})",
+    ]
+
+    if day_pnl is None:
+        lines.append("- **Yesterday-to-today P&L:** _Not available yet (needs at least one prior-day snapshot)._")
+    else:
+        lines.append(f"- **Yesterday-to-today P&L:** `{_fmt_usd(day_pnl, sign=True)}`")
+
+    executed = []
+    for result in run_results or []:
+        decision = result.get("decision", {})
+        risk = result.get("risk", {})
+        action = str(decision.get("action", "hold")).lower()
+        approved = bool(risk.get("approved", False))
+        if action in {"buy", "sell"} and approved:
+            executed.append(result)
+
+    if executed:
+        lines += [
+            "- **Executed today (with AI reasoning):**",
+            "",
+            "| Symbol | Action | Confidence | AI Reasoning |",
+            "|:-------|:------:|-----------:|:-------------|",
+        ]
+        for result in executed:
+            decision = result.get("decision", {})
+            symbol = result.get("symbol", "?")
+            action = str(decision.get("action", "?")).upper()
+            confidence = float(decision.get("confidence", 0.0))
+            reasoning = str(decision.get("reason", "No reasoning provided")).replace("\n", " ").strip()
+            lines.append(
+                f"| **{symbol}** | {action} | {confidence:.0%} | {reasoning} |"
+            )
+    else:
+        lines.append("- **Executed today:** No buy/sell orders were approved in this run.")
+
+    lines.append("")
 
     # ── open positions ─────────────────────────────────────────────────────────
     lines.append("### 📈 Open Positions")
