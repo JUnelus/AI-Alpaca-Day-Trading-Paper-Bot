@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Dict, Set
 
@@ -85,6 +86,7 @@ def run_once() -> dict:
     min_buying_power_to_trade = float(
         os.getenv("MIN_BUYING_POWER_TO_TRADE", str(config.get("min_buying_power_to_trade", 100.0)))
     )
+    allow_shorts = str(os.getenv("ALLOW_SHORTS", str(config.get("allow_shorts", False)))).lower() in {"1", "true", "yes"}
 
     previous_state = PortfolioState.load()
 
@@ -96,12 +98,12 @@ def run_once() -> dict:
     portfolio_budget = float(config.get("portfolio_size", 10_000))
     max_pos_value = portfolio_budget * max_pos_pct
 
-    # Fetch symbols we currently hold so we can gate SELL signals properly.
-    held_symbols: set[str] = set()
+    # Fetch current positions: map symbol → qty (positive = long, negative = short).
+    held_qty_map: Dict[str, float] = {}
     if alpaca.is_ready:
         for pos in alpaca.list_positions():
             sym_raw = getattr(pos, "symbol", "")
-            held_symbols.add(_normalize_sym(sym_raw))
+            held_qty_map[_normalize_sym(sym_raw)] = float(getattr(pos, "qty", 0))
 
     traded_today = _traded_symbols_today()
     risk_manager = RiskManager(min_confidence=min_confidence, max_risk_percent=max_risk_pct)
@@ -147,17 +149,28 @@ def run_once() -> dict:
 
         signal = generate_signal(snapshot)
 
-        # Gate sell signals: only sell if we actually hold the symbol.
-        # This avoids rejected short-sell errors on the paper account.
-        if signal.action == "sell" and sym not in held_symbols:
-            signal_map[sym] = {
-                "action": "hold",
-                "confidence": signal.strength,
-                "last_price": snapshot.last_price,
-                "day_change_percent": snapshot.day_change_percent,
-            }
-            results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": ["No position to sell"]}, "order_result": None})
-            continue
+        # Gate SELL signals based on long-only mode and current held position.
+        if signal.action == "sell":
+            held_qty = held_qty_map.get(sym, 0.0)
+            if held_qty == 0.0:
+                # No position at all — nothing to sell or short
+                rejection_reason = "No position to sell."
+                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent}
+                results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": [rejection_reason]}, "order_result": None})
+                continue
+            if not allow_shorts and held_qty < 0:
+                # Long-only mode: already short, don't deepen the short
+                rejection_reason = "Long-only mode: cannot add to an existing short position."
+                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent}
+                results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": [rejection_reason]}, "order_result": None})
+                continue
+            if not allow_shorts and held_qty == 0.0:
+                # Long-only mode: no position, sell would open a new short — block it
+                rejection_reason = "Long-only mode: SELL blocked — would open a new short position."
+                signal_map[sym] = {"action": "hold", "confidence": signal.strength, "last_price": snapshot.last_price, "day_change_percent": snapshot.day_change_percent}
+                results.append({"symbol": sym, "decision": {"action": "hold"}, "risk": {"approved": False, "reasons": [rejection_reason]}, "order_result": None})
+                continue
+            # held_qty > 0 → long position exists; allow sell-to-close
 
         qty = _calc_qty(snapshot.last_price, asset_type, max_pos_value)
         decision = build_decision(signal, last_price=snapshot.last_price, default_qty=qty).to_dict()
@@ -264,7 +277,7 @@ def run_once() -> dict:
         )
     write_daily_summary(SUMMARY_PATH, lines)
 
-    return {"results": results, "portfolio": state.__dict__}
+    return {"results": results, "portfolio": asdict(state)}
 
 
 if __name__ == "__main__":

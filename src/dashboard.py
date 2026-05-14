@@ -122,12 +122,13 @@ def generate_dashboard(
     if state.positions:
         lines += [
             "| Symbol | Type | Qty | Avg Cost | Price | Mkt Value | Unrealized P&L | P&L % |",
-            "|:-------|:----:|----:|---------:|------:|----------:|---------------:|------:|",
+            "|:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|",
         ]
         for pos in state.positions:
             icon = _icon(pos.unrealized_pnl)
+            position_label = f"{pos.asset_type.upper()} {'📉 SHORT' if pos.qty < 0 else ''}" .strip()
             lines.append(
-                f"| **{pos.symbol}** | {pos.asset_type.upper()} "
+                f"| **{pos.symbol}** | {position_label} "
                 f"| {_qty_str(pos.qty)} "
                 f"| ${pos.avg_entry_price:,.2f} "
                 f"| ${pos.current_price:,.2f} "

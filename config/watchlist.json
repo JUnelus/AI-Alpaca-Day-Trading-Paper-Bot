@@ -3,6 +3,7 @@
   "max_position_pct": 15,
   "min_confidence": 0.70,
   "min_buying_power_to_trade": 500,
+  "allow_shorts": false,
   "symbols": [
     {"symbol": "AAPL",    "name": "Apple Inc.",           "type": "stock"},
     {"symbol": "NVDA",    "name": "NVIDIA Corp.",          "type": "stock"},
