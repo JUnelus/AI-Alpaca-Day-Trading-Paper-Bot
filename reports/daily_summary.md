@@ -1,20 +1,20 @@
-# Daily Summary — 2026-05-14
+# Daily Summary — 2026-05-15
 
 ## 💰 Portfolio
-- Equity: $102,293.55
-- Cash:   $47,717.48
-- Buying power: $139,763.42
-- P&L:    $+1,687.35 (+16.87%)
+- Equity: $100,514.00
+- Cash:   $45,209.31
+- Buying power: $138,660.23
+- P&L:    $-32.33 (-0.32%)
 - Trades executed today: 6
 
 ## 🤖 AI Decisions
-- **AAPL** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **NVDA** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **AAPL** — BUY (conf=0.70) → ✅ APPROVED: Passed all risk checks
+- **NVDA** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
 - **TSLA** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
-- **MSFT** — BUY (conf=0.81) → ✅ APPROVED: Passed all risk checks
+- **MSFT** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
 - **AMZN** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
-- **META** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **SPY** — BUY (conf=0.76) → ✅ APPROVED: Passed all risk checks
-- **BTC/USD** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **ETH/USD** — BUY (conf=0.96) → ✅ APPROVED: Passed all risk checks
-- **SOL/USD** — BUY (conf=0.97) → ✅ APPROVED: Passed all risk checks
+- **META** — SELL (conf=0.78) → ✅ APPROVED: Passed all risk checks
+- **SPY** — SELL (conf=0.78) → ✅ APPROVED: Passed all risk checks
+- **BTC/USD** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **ETH/USD** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **SOL/USD** — SELL (conf=1.00) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
