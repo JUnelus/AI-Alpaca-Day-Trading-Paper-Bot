@@ -146,3 +146,11 @@
 2026-05-18T14:46:37.083101+00:00,BTC/USD,sell,0.8707794778624436,1.0,0.0196,77119.9,True,Approved
 2026-05-18T14:46:37.102250+00:00,ETH/USD,sell,0.8068633709468462,1.0,0.7114,2129.49,True,Approved
 2026-05-18T14:46:37.129526+00:00,SOL/USD,sell,0.889398886565972,1.0,17.8763,84.75,True,Approved
+2026-05-18T21:41:47.854075+00:00,AAPL,sell,0.7592112713586279,1.0,5.0,300.82,True,Approved
+2026-05-18T21:41:47.881219+00:00,NVDA,sell,0.8662879460323096,1.0,6.0,224.54,True,Approved
+2026-05-18T21:41:47.909440+00:00,MSFT,hold,0.5,1.0,3.0,423.54,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
+2026-05-18T21:41:47.909568+00:00,AMZN,hold,0.5,1.0,5.0,264.86,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
+2026-05-18T21:41:47.909676+00:00,SPY,hold,0.5,1.0,2.0,738.65,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
+2026-05-18T21:41:47.909793+00:00,BTC/USD,sell,0.7146460633363919,1.0,0.0195,77730.22,True,Approved
+2026-05-18T21:41:47.936604+00:00,ETH/USD,hold,0.5,1.0,0.7027,2134.74,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
+2026-05-18T21:41:47.936786+00:00,SOL/USD,hold,0.5,1.0,17.5706,85.37,False,Rejected: confidence 0.50 below 0.70. | Rejected: hold signal does not place a trade.
