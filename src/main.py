@@ -282,6 +282,45 @@ def run_once() -> dict:
         )
     write_daily_summary(SUMMARY_PATH, lines)
 
+    # ── send daily report via email ────────────────────────────────────────────────
+    executed_trades = [
+        {
+            "symbol": r["symbol"],
+            "action": r["decision"].get("action", "?"),
+            "confidence": r["decision"].get("confidence", 0),
+            "reason": r["decision"].get("reason", "—"),
+        }
+        for r in results
+        if r["risk"]["approved"] and r.get("order_result")
+    ]
+    
+    open_positions = [
+        {
+            "symbol": pos.symbol,
+            "asset_type": pos.asset_type,
+            "qty": pos.qty,
+            "avg_cost": pos.avg_entry_price,
+            "price": pos.current_price,
+            "mkt_value": pos.market_value,
+            "unrealized_pnl": pos.unrealized_pnl,
+            "pnl_pct": pos.unrealized_pnl_pct * 100,
+        }
+        for pos in state.positions
+    ]
+    
+    predictions_data = [
+        {
+            "symbol": sym_cfg["symbol"],
+            "name": sym_cfg.get("name", "?"),
+            "action": signal_map.get(sym_cfg["symbol"], {}).get("prediction", {}).get("action", "HOLD"),
+            "confidence": int(signal_map.get(sym_cfg["symbol"], {}).get("prediction", {}).get("confidence", 50) * 100),
+            "basis": signal_map.get(sym_cfg["symbol"], {}).get("prediction", {}).get("basis", "—"),
+        }
+        for sym_cfg in symbols
+    ]
+    
+    send_daily_report(state, executed_trades, open_positions, predictions_data)
+
     return {"results": results, "portfolio": asdict(state)}
 
 

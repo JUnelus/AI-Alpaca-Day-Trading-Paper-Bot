@@ -52,6 +52,11 @@ jobs:
           ALPACA_PAPER:      'true'
           MIN_CONFIDENCE:    '0.70'
           MAX_RISK_PERCENT:  '1'
+          SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD:   ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENT_EMAIL:   ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_SERVER:       'smtp.gmail.com'
+          SMTP_PORT:         '587'
         run: python -m src.main
 
       # ── commit back ─────────────────────────────────────────────────────────
