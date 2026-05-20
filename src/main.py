@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from .ai_agent import build_decision
 from .alpaca_client import AlpacaClient
 from .dashboard import generate_dashboard, update_readme
+from .email_reporter import send_daily_report
 from .logger import log_ai_decision, write_daily_summary
 from .market_data import get_market_snapshots
 from .portfolio import PortfolioState, STATE_FILE, refresh_from_alpaca
