@@ -1,20 +1,20 @@
 # Daily Summary — 2026-05-21
 
 ## 💰 Portfolio
-- Equity: $98,868.90
-- Cash:   $49,098.75
-- Buying power: $140,834.60
-- P&L:    $-1,352.79 (-13.53%)
-- Trades executed today: 5
+- Equity: $99,053.91
+- Cash:   $51,594.92
+- Buying power: $139,365.40
+- P&L:    $-1,146.12 (-11.46%)
+- Trades executed today: 4
 
 ## 🤖 AI Decisions
-- **AAPL** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **NVDA** — SELL (conf=0.96) → ✅ APPROVED: Passed all risk checks
-- **TSLA** — SELL (conf=0.75) → ✅ APPROVED: Passed all risk checks
-- **MSFT** — SELL (conf=0.81) → ✅ APPROVED: Passed all risk checks
-- **AMZN** — SELL (conf=0.70) → ✅ APPROVED: Passed all risk checks
-- **META** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
+- **AAPL** — BUY (conf=0.78) → ✅ APPROVED: Passed all risk checks
+- **NVDA** — SELL (conf=0.95) → ✅ APPROVED: Passed all risk checks
+- **TSLA** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
+- **MSFT** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
+- **AMZN** — BUY (conf=0.86) → ✅ APPROVED: Passed all risk checks
+- **META** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
 - **SPY** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **BTC/USD** — SELL (conf=0.74) → ✅ APPROVED: Passed all risk checks
-- **ETH/USD** — SELL (conf=0.69) → ❌ REJECTED: Rejected: confidence 0.69 below 0.70.
-- **SOL/USD** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
+- **BTC/USD** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
+- **ETH/USD** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
+- **SOL/USD** — BUY (conf=0.89) → ✅ APPROVED: Passed all risk checks
