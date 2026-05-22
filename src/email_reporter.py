@@ -38,8 +38,15 @@ def send_daily_report(
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
     # Skip if not configured
-    if not sender_email or not sender_password or not recipient:
-        print("⚠️  Email not configured. Skipping: set SENDER_EMAIL, SENDER_PASSWORD, RECIPIENT_EMAIL")
+    missing = []
+    if not sender_email:
+        missing.append("SENDER_EMAIL")
+    if not sender_password:
+        missing.append("SENDER_PASSWORD")
+    if not recipient:
+        missing.append("RECIPIENT_EMAIL")
+    if missing:
+        print(f"[email] Skipping send. Missing required env vars: {', '.join(missing)}")
         return False
 
     try:
@@ -54,16 +61,17 @@ def send_daily_report(
         msg.attach(MIMEText(html_body, "html"))
 
         # Send via SMTP
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as server:
             server.starttls()
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, recipient, msg.as_string())
 
-        print(f"✅ Daily report sent to {recipient}")
+        print(f"[email] Daily report sent to {recipient}")
         return True
 
     except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+        print(f"[email] Failed to send via {smtp_server}:{smtp_port} to {recipient}: {e}")
+        print("[email] If using Gmail, ensure 2FA is enabled and SENDER_PASSWORD is an app password.")
         return False
 
 

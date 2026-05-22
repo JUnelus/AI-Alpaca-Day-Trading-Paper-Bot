@@ -57,6 +57,7 @@ jobs:
           RECIPIENT_EMAIL:   ${{ secrets.RECIPIENT_EMAIL }}
           SMTP_SERVER:       'smtp.gmail.com'
           SMTP_PORT:         '587'
+          EMAIL_REQUIRED:    'true'
         run: python -m src.main
 
       # ── commit back ─────────────────────────────────────────────────────────

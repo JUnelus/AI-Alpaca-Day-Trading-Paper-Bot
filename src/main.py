@@ -78,6 +78,7 @@ def _calc_qty(price: float, asset_type: str, max_position_value: float) -> float
 
 def run_once() -> dict:
     load_dotenv()
+    email_required = str(os.getenv("EMAIL_REQUIRED", "false")).lower() in {"1", "true", "yes"}
 
     config = _load_watchlist()
     symbols: list[dict] = config["symbols"]
@@ -320,7 +321,9 @@ def run_once() -> dict:
         for sym_cfg in symbols
     ]
     
-    send_daily_report(state, executed_trades, open_positions, predictions_data)
+    email_sent = send_daily_report(state, executed_trades, open_positions, predictions_data)
+    if email_required and not email_sent:
+        raise RuntimeError("EMAIL_REQUIRED=true but daily report email was not sent.")
 
     return {"results": results, "portfolio": asdict(state)}
 
