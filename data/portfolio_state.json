@@ -1,8 +1,8 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 98468.27,
+  "account_equity": 98409.35,
   "cash": 46615.34,
-  "buying_power": 131476.34,
+  "buying_power": 128971.68,
   "positions": [
     {
       "symbol": "AAPL",
@@ -29,20 +29,20 @@
       "asset_type": "crypto",
       "qty": 0.03696175,
       "avg_entry_price": 77527.189013541,
-      "current_price": 77476.7,
-      "market_value": 2863.674416,
-      "unrealized_pnl": -1.866163,
-      "unrealized_pnl_pct": -0.0651242915206954
+      "current_price": 77260.863,
+      "market_value": 2855.696703,
+      "unrealized_pnl": -9.843876,
+      "unrealized_pnl_pct": -0.3435259676231803
     },
     {
       "symbol": "ETH/USD",
       "asset_type": "crypto",
       "qty": 1.35024,
       "avg_entry_price": 2126.133052035,
-      "current_price": 2123.62,
-      "market_value": 2867.396669,
-      "unrealized_pnl": -3.393223,
-      "unrealized_pnl_pct": -0.11819823558817072
+      "current_price": 2108.0,
+      "market_value": 2846.30592,
+      "unrealized_pnl": -24.483972,
+      "unrealized_pnl_pct": -0.8528653408839253
     },
     {
       "symbol": "NVDA",
@@ -59,10 +59,10 @@
       "asset_type": "crypto",
       "qty": 33.33157525,
       "avg_entry_price": 86.745846571,
-      "current_price": 86.011,
-      "market_value": 2866.882119,
-      "unrealized_pnl": -24.493594,
-      "unrealized_pnl_pct": -0.8471259509170415
+      "current_price": 85.1154,
+      "market_value": 2837.03036,
+      "unrealized_pnl": -54.345353,
+      "unrealized_pnl_pct": -1.8795673202571779
     },
     {
       "symbol": "SPY",
@@ -85,10 +85,10 @@
       "unrealized_pnl_pct": 0.43891885341914105
     }
   ],
-  "total_pnl": -1288.70581,
-  "total_pnl_pct": -12.887058099999999,
+  "total_pnl": -1347.626031,
+  "total_pnl_pct": -13.476260309999999,
   "yesterday_total_pnl": -1465.173734,
   "yesterday_equity": 98363.68,
-  "last_updated": "2026-05-25T14:41:09.293822+00:00",
-  "trades_today": 7
+  "last_updated": "2026-05-25T21:40:00.282963+00:00",
+  "trades_today": 4
 }

@@ -95,7 +95,7 @@ python -m src.main                   # run one full cycle
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-05-25 14:41 UTC &nbsp;|&nbsp; **Trades today:** 7 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-05-25 21:40 UTC &nbsp;|&nbsp; **Trades today:** 4 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -104,15 +104,15 @@ python -m src.main                   # run one full cycle
 | Metric | Value |
 |:-------|------:|
 | 🏦 Starting Balance  | `$10,000.00` |
-| 💵 Current Equity    | `$98,468.27` |
+| 💵 Current Equity    | `$98,409.35` |
 | 💸 Cash Available    | `$46,615.34` |
-| 🧾 Buying Power      | `$131,476.34` |
-| 🔴 Total P&L | `$-1,288.71` &nbsp; `(-12.89%)` |
+| 🧾 Buying Power      | `$128,971.68` |
+| 🔴 Total P&L | `$-1,347.63` &nbsp; `(-13.48%)` |
 
 ### 📝 Daily Trade Summary
 
-- **Startup-to-date Total P&L:** `$-1,288.71` (-12.89%)
-- **Yesterday-to-today P&L:** `+$176.47`
+- **Startup-to-date Total P&L:** `$-1,347.63` (-13.48%)
+- **Yesterday-to-today P&L:** `+$117.55`
 - **Executed today (with AI reasoning):**
 
 | Symbol | Action | Confidence | AI Reasoning |
@@ -121,9 +121,6 @@ python -m src.main                   # run one full cycle
 | **NVDA** | SELL | 98% | Negative momentum detected |
 | **TSLA** | BUY | 99% | Positive momentum detected |
 | **AMZN** | SELL | 76% | Negative momentum detected |
-| **BTC/USD** | BUY | 73% | Positive momentum detected |
-| **ETH/USD** | BUY | 82% | Positive momentum detected |
-| **SOL/USD** | BUY | 82% | Positive momentum detected |
 
 ### 📈 Open Positions
 
@@ -131,10 +128,10 @@ python -m src.main                   # run one full cycle
 |:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|
 | **AAPL** | STOCK | 24.00 | $305.39 | $308.82 | $7,411.68 | 🟢 +$82.37 | +1.12% |
 | **AMZN** | STOCK | 20.00 | $267.55 | $266.32 | $5,326.40 | 🔴 $-24.55 | -0.46% |
-| **BTC/USD** | CRYPTO | 0.0370 | $77,527.19 | $77,476.70 | $2,863.67 | 🔴 $-1.87 | -0.07% |
-| **ETH/USD** | CRYPTO | 1.3502 | $2,126.13 | $2,123.62 | $2,867.40 | 🔴 $-3.39 | -0.12% |
+| **BTC/USD** | CRYPTO | 0.0370 | $77,527.19 | $77,260.86 | $2,855.70 | 🔴 $-9.84 | -0.34% |
+| **ETH/USD** | CRYPTO | 1.3502 | $2,126.13 | $2,108.00 | $2,846.31 | 🔴 $-24.48 | -0.85% |
 | **NVDA** | STOCK | 116.00 | $227.04 | $215.33 | $24,978.28 | 🔴 $-1,358.73 | -5.16% |
-| **SOL/USD** | CRYPTO | 33.33 | $86.75 | $86.01 | $2,866.88 | 🔴 $-24.49 | -0.85% |
+| **SOL/USD** | CRYPTO | 33.33 | $86.75 | $85.12 | $2,837.03 | 🔴 $-54.35 | -1.88% |
 | **SPY** | ETF | 4.0000 | $737.94 | $745.64 | $2,982.56 | 🟢 +$30.79 | +1.04% |
 | **TSLA** | STOCK | 6.0000 | $424.15 | $426.01 | $2,556.06 | 🟢 +$11.17 | +0.44% |
 
@@ -149,9 +146,9 @@ python -m src.main                   # run one full cycle
 | 5 | **AMZN** | Amazon.com Inc. | STOCK | $266.32 | 🔴 -0.80% | **SELL** | 76% |
 | 6 | **META** | Meta Platforms Inc. | STOCK | $610.26 | 🟢 +0.47% | **BUY** | 69% |
 | 7 | **SPY** | SPDR S&P 500 ETF | ETF | $745.64 | 🟢 +0.39% | HOLD | — |
-| 8 | **BTC/USD** | Bitcoin | CRYPTO | $77,490.49 | 🟢 +0.66% | **BUY** | 73% |
-| 9 | **ETH/USD** | Ethereum | CRYPTO | $2,121.52 | 🟢 +1.10% | **BUY** | 82% |
-| 10 | **SOL/USD** | Solana | CRYPTO | $86.08 | 🟢 +1.09% | **BUY** | 82% |
+| 8 | **BTC/USD** | Bitcoin | CRYPTO | $77,224.35 | 🟢 +0.31% | HOLD | — |
+| 9 | **ETH/USD** | Ethereum | CRYPTO | $2,106.76 | 🟢 +0.40% | **BUY** | 68% |
+| 10 | **SOL/USD** | Solana | CRYPTO | $85.29 | 🟢 +0.16% | HOLD | — |
 
 ---
 
@@ -168,9 +165,9 @@ python -m src.main                   # run one full cycle
 | 5 | **AMZN** | Amazon.com Inc. | **SELL** | 67% | Moderate negative momentum (-0.80%) — continuation expected |
 | 6 | **META** | Meta Platforms Inc. | **BUY** | 61% | Moderate positive momentum (+0.47%) — continuation expected |
 | 7 | **SPY** | SPDR S&P 500 ETF | HOLD | 50% | Flat session today (+0.39%) — no trend to carry forward |
-| 8 | **BTC/USD** | Bitcoin | **BUY** | 64% | Moderate positive momentum (+0.66%) — continuation expected |
-| 9 | **ETH/USD** | Ethereum | **BUY** | 72% | Moderate positive momentum (+1.10%) — continuation expected |
-| 10 | **SOL/USD** | Solana | **BUY** | 72% | Moderate positive momentum (+1.09%) — continuation expected |
+| 8 | **BTC/USD** | Bitcoin | HOLD | 50% | Flat session today (+0.31%) — no trend to carry forward |
+| 9 | **ETH/USD** | Ethereum | **BUY** | 60% | Moderate positive momentum (+0.40%) — continuation expected |
+| 10 | **SOL/USD** | Solana | HOLD | 50% | Flat session today (+0.16%) — no trend to carry forward |
 
 ---
 
