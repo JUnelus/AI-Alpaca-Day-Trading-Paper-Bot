@@ -1,94 +1,84 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 98689.56,
-  "cash": 46302.64,
-  "buying_power": 135509.28,
+  "account_equity": 98305.83,
+  "cash": 48137.22,
+  "buying_power": 140462.24,
   "positions": [
     {
       "symbol": "AAPL",
       "asset_type": "stock",
       "qty": 40.0,
       "avg_entry_price": 307.556,
-      "current_price": 311.255,
-      "market_value": 12450.2,
-      "unrealized_pnl": 147.96,
-      "unrealized_pnl_pct": 1.2027077995552031
-    },
-    {
-      "symbol": "AMZN",
-      "asset_type": "stock",
-      "qty": 5.0,
-      "avg_entry_price": 267.5475,
-      "current_price": 264.44,
-      "market_value": 1322.2,
-      "unrealized_pnl": -15.5375,
-      "unrealized_pnl_pct": -1.161475999588858
+      "current_price": 308.41,
+      "market_value": 12336.4,
+      "unrealized_pnl": 34.16,
+      "unrealized_pnl_pct": 0.2776730091430504
     },
     {
       "symbol": "BTC/USD",
       "asset_type": "crypto",
       "qty": 0.01746175,
       "avg_entry_price": 77527.189013541,
-      "current_price": 76700.0,
-      "market_value": 1339.316225,
-      "unrealized_pnl": -14.444168,
-      "unrealized_pnl_pct": -1.0669663610546034
+      "current_price": 75862.79,
+      "market_value": 1324.697073,
+      "unrealized_pnl": -29.06332,
+      "unrealized_pnl_pct": -2.1468584954540457
     },
     {
       "symbol": "ETH/USD",
       "asset_type": "crypto",
-      "qty": 1.35024,
+      "qty": 0.62724,
       "avg_entry_price": 2126.133052035,
-      "current_price": 2109.0,
-      "market_value": 2847.65616,
-      "unrealized_pnl": -23.133732,
-      "unrealized_pnl_pct": -0.8058315957924379
+      "current_price": 2076.58,
+      "market_value": 1302.514039,
+      "unrealized_pnl": -31.081657,
+      "unrealized_pnl_pct": -2.3306656660274223
     },
     {
       "symbol": "NVDA",
       "asset_type": "stock",
-      "qty": 102.0,
-      "avg_entry_price": 226.653676,
-      "current_price": 217.15,
-      "market_value": 22149.3,
-      "unrealized_pnl": -969.374952,
-      "unrealized_pnl_pct": -4.193038545732654
+      "qty": 104.0,
+      "avg_entry_price": 226.471106,
+      "current_price": 214.4501,
+      "market_value": 22302.8104,
+      "unrealized_pnl": -1250.184624,
+      "unrealized_pnl_pct": -5.307964540076913
     },
     {
       "symbol": "SOL/USD",
       "asset_type": "crypto",
-      "qty": 33.33157525,
+      "qty": 15.41877525,
       "avg_entry_price": 86.745846571,
-      "current_price": 84.58,
-      "market_value": 2819.184635,
-      "unrealized_pnl": -72.191078,
-      "unrealized_pnl_pct": -2.496772649962121
+      "current_price": 83.91,
+      "market_value": 1293.789431,
+      "unrealized_pnl": -43.725281,
+      "unrealized_pnl_pct": -3.269143928124612
     },
     {
       "symbol": "SPY",
       "asset_type": "etf",
-      "qty": 4.0,
-      "avg_entry_price": 737.9425,
-      "current_price": 752.005,
-      "market_value": 3008.02,
-      "unrealized_pnl": 56.25,
-      "unrealized_pnl_pct": 1.9056362792493995
+      "qty": 5.0,
+      "avg_entry_price": 740.756,
+      "current_price": 750.1,
+      "market_value": 3750.5,
+      "unrealized_pnl": 46.72,
+      "unrealized_pnl_pct": 1.2614140148712938
     },
     {
       "symbol": "TSLA",
       "asset_type": "stock",
-      "qty": 15.0,
-      "avg_entry_price": 427.564666,
-      "current_price": 430.186,
-      "market_value": 6452.79,
-      "unrealized_pnl": 39.32001,
-      "unrealized_pnl_pct": 0.6130848052818285
+      "qty": 18.0,
+      "avg_entry_price": 428.006111,
+      "current_price": 436.55,
+      "market_value": 7857.9,
+      "unrealized_pnl": 153.790002,
+      "unrealized_pnl_pct": 1.9962072457418718
     }
   ],
-  "total_pnl": -851.15142,
-  "total_pnl_pct": -8.5115142,
+  "total_pnl": -1119.38488,
+  "total_pnl_pct": -11.1938488,
   "yesterday_total_pnl": -1347.626031,
   "yesterday_equity": 98409.35,
-  "last_updated": "2026-05-26T14:42:48.156269+00:00",
-  "trades_today": 6
+  "last_updated": "2026-05-26T21:51:52.542556+00:00",
+  "trades_today": 4
 }
