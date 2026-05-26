@@ -1,20 +1,20 @@
-# Daily Summary — 2026-05-25
+# Daily Summary — 2026-05-26
 
 ## 💰 Portfolio
-- Equity: $98,409.35
-- Cash:   $46,615.34
-- Buying power: $128,971.68
-- P&L:    $-1,347.63 (-13.48%)
-- Trades executed today: 4
+- Equity: $98,689.56
+- Cash:   $46,302.64
+- Buying power: $135,509.28
+- P&L:    $-851.15 (-8.51%)
+- Trades executed today: 6
 
 ## 🤖 AI Decisions
-- **AAPL** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
-- **NVDA** — SELL (conf=0.98) → ✅ APPROVED: Passed all risk checks
-- **TSLA** — BUY (conf=0.99) → ✅ APPROVED: Passed all risk checks
+- **AAPL** — BUY (conf=0.76) → ✅ APPROVED: Passed all risk checks
+- **NVDA** — BUY (conf=0.77) → ✅ APPROVED: Passed all risk checks
+- **TSLA** — BUY (conf=0.79) → ✅ APPROVED: Passed all risk checks
 - **MSFT** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **AMZN** — SELL (conf=0.76) → ✅ APPROVED: Passed all risk checks
-- **META** — BUY (conf=0.69) → ❌ REJECTED: Rejected: confidence 0.69 below 0.70.
-- **SPY** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **BTC/USD** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **ETH/USD** — BUY (conf=0.68) → ❌ REJECTED: Rejected: confidence 0.68 below 0.70.
+- **AMZN** — SELL (conf=0.72) → ✅ APPROVED: Passed all risk checks
+- **META** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
+- **SPY** — BUY (conf=0.77) → ✅ APPROVED: Passed all risk checks
+- **BTC/USD** — SELL (conf=0.72) → ✅ APPROVED: Passed all risk checks
+- **ETH/USD** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
 - **SOL/USD** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
