@@ -1,94 +1,94 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 98294.69,
-  "cash": 39101.29,
-  "buying_power": 130975.79,
+  "account_equity": 98435.83,
+  "cash": 38892.41,
+  "buying_power": 130892.45,
   "positions": [
     {
       "symbol": "AAPL",
       "asset_type": "stock",
-      "qty": 52.0,
+      "qty": 48.0,
       "avg_entry_price": 308.648462,
-      "current_price": 306.865,
-      "market_value": 15956.98,
-      "unrealized_pnl": -92.740024,
-      "unrealized_pnl_pct": -0.577829543825817
+      "current_price": 305.65,
+      "market_value": 14671.2,
+      "unrealized_pnl": -143.926176,
+      "unrealized_pnl_pct": -0.9714812704947158
     },
     {
       "symbol": "BTC/USD",
       "asset_type": "crypto",
       "qty": 0.01746175,
       "avg_entry_price": 77505.88,
-      "current_price": 71205.0,
-      "market_value": 1243.363909,
-      "unrealized_pnl": -110.024391,
-      "unrealized_pnl_pct": -8.129550919915843
+      "current_price": 70904.7,
+      "market_value": 1238.120145,
+      "unrealized_pnl": -115.268155,
+      "unrealized_pnl_pct": -8.51700542943475
     },
     {
       "symbol": "ETH/USD",
       "asset_type": "crypto",
       "qty": 0.62724,
       "avg_entry_price": 2122.3,
-      "current_price": 1972.7,
-      "market_value": 1237.356348,
-      "unrealized_pnl": -93.835104,
-      "unrealized_pnl_pct": -7.048956320972528
+      "current_price": 1988.85,
+      "market_value": 1247.486274,
+      "unrealized_pnl": -83.705178,
+      "unrealized_pnl_pct": -6.287989445412995
     },
     {
       "symbol": "MSFT",
       "asset_type": "stock",
-      "qty": 12.0,
-      "avg_entry_price": 441.715834,
-      "current_price": 461.165,
-      "market_value": 5533.98,
-      "unrealized_pnl": 233.389992,
-      "unrealized_pnl_pct": 4.403094592257701
+      "qty": 15.0,
+      "avg_entry_price": 445.616667,
+      "current_price": 453.7,
+      "market_value": 6805.5,
+      "unrealized_pnl": 121.249995,
+      "unrealized_pnl_pct": 1.81396558939749
     },
     {
       "symbol": "NVDA",
       "asset_type": "stock",
-      "qty": 90.0,
-      "avg_entry_price": 225.994158,
-      "current_price": 220.105,
-      "market_value": 19809.45,
-      "unrealized_pnl": -530.02422,
-      "unrealized_pnl_pct": -2.6058894849839436
+      "qty": 96.0,
+      "avg_entry_price": 225.626605,
+      "current_price": 224.69,
+      "market_value": 21570.24,
+      "unrealized_pnl": -89.91408,
+      "unrealized_pnl_pct": -0.4151128365380492
     },
     {
       "symbol": "SOL/USD",
       "asset_type": "crypto",
       "qty": 15.41877525,
       "avg_entry_price": 86.153446599,
-      "current_price": 80.1013,
-      "market_value": 1235.063942,
-      "unrealized_pnl": -93.316688,
-      "unrealized_pnl_pct": -7.0248455814482496
+      "current_price": 80.502463054,
+      "market_value": 1241.249385,
+      "unrealized_pnl": -87.131245,
+      "unrealized_pnl_pct": -6.559207731893945
     },
     {
       "symbol": "SPY",
       "asset_type": "etf",
       "qty": 7.0,
       "avg_entry_price": 744.357143,
-      "current_price": 757.25,
-      "market_value": 5300.75,
-      "unrealized_pnl": 90.249999,
-      "unrealized_pnl_pct": 1.7320794354223055
+      "current_price": 756.96,
+      "market_value": 5298.72,
+      "unrealized_pnl": 88.219999,
+      "unrealized_pnl_pct": 1.6931196427035566
     },
     {
       "symbol": "TSLA",
       "asset_type": "stock",
-      "qty": 21.0,
+      "qty": 18.0,
       "avg_entry_price": 433.938333,
-      "current_price": 422.71,
-      "market_value": 8876.91,
-      "unrealized_pnl": -235.794993,
-      "unrealized_pnl_pct": -2.5875411656706535
+      "current_price": 415.05,
+      "market_value": 7470.9,
+      "unrealized_pnl": -339.989994,
+      "unrealized_pnl_pct": -4.3527689451671465
     }
   ],
-  "total_pnl": -832.095429,
-  "total_pnl_pct": -8.32095429,
+  "total_pnl": -650.464834,
+  "total_pnl_pct": -6.504648339999999,
   "yesterday_total_pnl": -1146.1454680000002,
   "yesterday_equity": 98059.75,
-  "last_updated": "2026-06-01T15:44:25.799204+00:00",
+  "last_updated": "2026-06-01T22:16:51.063394+00:00",
   "trades_today": 4
 }
