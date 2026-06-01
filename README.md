@@ -95,7 +95,7 @@ python -m src.main                   # run one full cycle
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-05-29 21:52 UTC &nbsp;|&nbsp; **Trades today:** 4 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-06-01 15:44 UTC &nbsp;|&nbsp; **Trades today:** 4 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -104,52 +104,54 @@ python -m src.main                   # run one full cycle
 | Metric | Value |
 |:-------|------:|
 | 🏦 Starting Balance  | `$10,000.00` |
-| 💵 Current Equity    | `$98,059.75` |
-| 💸 Cash Available    | `$36,349.15` |
-| 🧾 Buying Power      | `$129,261.27` |
-| 🔴 Total P&L | `$-1,146.15` &nbsp; `(-11.46%)` |
+| 💵 Current Equity    | `$98,294.69` |
+| 💸 Cash Available    | `$39,101.29` |
+| 🧾 Buying Power      | `$130,975.79` |
+| 🔴 Total P&L | `$-832.10` &nbsp; `(-8.32%)` |
 
 ### 📝 Daily Trade Summary
 
-- **Startup-to-date Total P&L:** `$-1,146.15` (-11.46%)
-- **Yesterday-to-today P&L:** `$-362.34`
+- **Startup-to-date Total P&L:** `$-832.10` (-8.32%)
+- **Yesterday-to-today P&L:** `+$314.05`
 - **Executed today (with AI reasoning):**
 
 | Symbol | Action | Confidence | AI Reasoning |
 |:-------|:------:|-----------:|:-------------|
-| **NVDA** | SELL | 89% | Negative momentum detected |
-| **TSLA** | SELL | 89% | Negative momentum detected |
+| **AAPL** | SELL | 93% | Negative momentum detected |
+| **NVDA** | BUY | 100% | Positive momentum detected |
+| **TSLA** | SELL | 100% | Negative momentum detected |
 | **MSFT** | BUY | 100% | Positive momentum detected |
-| **AMZN** | SELL | 85% | Negative momentum detected |
+| **BTC/USD** | SELL | 100% | Negative momentum detected |
+| **ETH/USD** | SELL | 93% | Negative momentum detected |
+| **SOL/USD** | SELL | 100% | Negative momentum detected |
 
 ### 📈 Open Positions
 
 | Symbol | Type | Qty | Avg Cost | Price | Mkt Value | Unrealized P&L | P&L % |
 |:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|
-| **AAPL** | STOCK | 52.00 | $308.65 | $311.25 | $16,185.00 | 🟢 +$135.28 | +0.84% |
-| **AMZN** | STOCK | 5.0000 | $271.92 | $270.55 | $1,352.75 | 🔴 $-6.86 | -0.50% |
-| **BTC/USD** | CRYPTO | 0.0175 | $77,505.88 | $73,370.41 | $1,281.18 | 🔴 $-72.21 | -5.34% |
-| **ETH/USD** | CRYPTO | 0.6272 | $2,122.30 | $2,008.34 | $1,259.71 | 🔴 $-71.48 | -5.37% |
-| **MSFT** | STOCK | 9.0000 | $435.56 | $449.36 | $4,044.21 | 🟢 +$124.17 | +3.17% |
-| **NVDA** | STOCK | 97.00 | $225.99 | $212.50 | $20,612.34 | 🔴 $-1,309.10 | -5.97% |
-| **SOL/USD** | CRYPTO | 15.42 | $86.15 | $81.63 | $1,258.62 | 🔴 $-69.76 | -5.25% |
-| **SPY** | ETF | 7.0000 | $744.36 | $755.44 | $5,288.08 | 🟢 +$77.58 | +1.49% |
-| **TSLA** | STOCK | 24.00 | $432.60 | $434.53 | $10,428.72 | 🟢 +$46.23 | +0.45% |
+| **AAPL** | STOCK | 52.00 | $308.65 | $306.87 | $15,956.98 | 🔴 $-92.74 | -0.58% |
+| **BTC/USD** | CRYPTO | 0.0175 | $77,505.88 | $71,205.00 | $1,243.36 | 🔴 $-110.02 | -8.13% |
+| **ETH/USD** | CRYPTO | 0.6272 | $2,122.30 | $1,972.70 | $1,237.36 | 🔴 $-93.84 | -7.05% |
+| **MSFT** | STOCK | 12.00 | $441.72 | $461.17 | $5,533.98 | 🟢 +$233.39 | +4.40% |
+| **NVDA** | STOCK | 90.00 | $225.99 | $220.10 | $19,809.45 | 🔴 $-530.02 | -2.61% |
+| **SOL/USD** | CRYPTO | 15.42 | $86.15 | $80.10 | $1,235.06 | 🔴 $-93.32 | -7.02% |
+| **SPY** | ETF | 7.0000 | $744.36 | $757.25 | $5,300.75 | 🟢 +$90.25 | +1.73% |
+| **TSLA** | STOCK | 21.00 | $433.94 | $422.71 | $8,876.91 | 🔴 $-235.79 | -2.59% |
 
 ### 🎯 Watchlist — 10 Symbols
 
 | # | Symbol | Name | Type | Last Price | Day Change | Signal | Confidence |
 |--:|:-------|:-----|:----:|-----------:|-----------:|:------:|:----------:|
-| 1 | **AAPL** | Apple Inc. | STOCK | $312.06 | 🔴 -0.14% | HOLD | — |
-| 2 | **NVDA** | NVIDIA Corp. | STOCK | $211.14 | 🔴 -1.45% | **SELL** | 89% |
-| 3 | **TSLA** | Tesla Inc. | STOCK | $435.79 | 🔴 -1.43% | **SELL** | 89% |
-| 4 | **MSFT** | Microsoft Corp. | STOCK | $450.24 | 🟢 +5.45% | **BUY** | 100% |
-| 5 | **AMZN** | Amazon.com Inc. | STOCK | $270.64 | 🔴 -1.23% | **SELL** | 85% |
-| 6 | **META** | Meta Platforms Inc. | STOCK | $632.51 | 🔴 -0.44% | HOLD | — |
-| 7 | **SPY** | SPDR S&P 500 ETF | ETF | $756.48 | 🟢 +0.25% | HOLD | — |
-| 8 | **BTC/USD** | Bitcoin | CRYPTO | $73,357.75 | 🔴 -0.21% | HOLD | — |
-| 9 | **ETH/USD** | Ethereum | CRYPTO | $2,008.15 | 🟢 +0.06% | HOLD | — |
-| 10 | **SOL/USD** | Solana | CRYPTO | $81.81 | 🔴 -0.27% | HOLD | — |
+| 1 | **AAPL** | Apple Inc. | STOCK | $306.93 | 🔴 -1.64% | **SELL** | 93% |
+| 2 | **NVDA** | NVIDIA Corp. | STOCK | $220.02 | 🟢 +4.21% | **BUY** | 100% |
+| 3 | **TSLA** | Tesla Inc. | STOCK | $423.12 | 🔴 -2.91% | **SELL** | 100% |
+| 4 | **MSFT** | Microsoft Corp. | STOCK | $461.49 | 🟢 +2.50% | **BUY** | 100% |
+| 5 | **AMZN** | Amazon.com Inc. | STOCK | $264.27 | 🔴 -2.35% | HOLD | — |
+| 6 | **META** | Meta Platforms Inc. | STOCK | $613.79 | 🔴 -2.96% | HOLD | — |
+| 7 | **SPY** | SPDR S&P 500 ETF | ETF | $757.25 | 🟢 +0.10% | HOLD | — |
+| 8 | **BTC/USD** | Bitcoin | CRYPTO | $71,156.78 | 🔴 -3.31% | **SELL** | 100% |
+| 9 | **ETH/USD** | Ethereum | CRYPTO | $1,971.37 | 🔴 -1.63% | **SELL** | 93% |
+| 10 | **SOL/USD** | Solana | CRYPTO | $79.78 | 🔴 -3.07% | **SELL** | 100% |
 
 ---
 
@@ -159,16 +161,16 @@ python -m src.main                   # run one full cycle
 
 | # | Symbol | Name | Predicted Action | Confidence | Basis |
 |--:|:-------|:-----|:----------------:|-----------:|:------|
-| 1 | **AAPL** | Apple Inc. | HOLD | 50% | Flat session today (-0.14%) — no trend to carry forward |
-| 2 | **NVDA** | NVIDIA Corp. | **SELL** | 78% | Moderate negative momentum (-1.45%) — continuation expected |
-| 3 | **TSLA** | Tesla Inc. | **SELL** | 78% | Moderate negative momentum (-1.43%) — continuation expected |
-| 4 | **MSFT** | Microsoft Corp. | **SELL** | 78% | Extreme gain today (+5.45%) — mean reversion pullback likely |
-| 5 | **AMZN** | Amazon.com Inc. | **SELL** | 74% | Moderate negative momentum (-1.23%) — continuation expected |
-| 6 | **META** | Meta Platforms Inc. | **SELL** | 61% | Moderate negative momentum (-0.44%) — continuation expected |
-| 7 | **SPY** | SPDR S&P 500 ETF | HOLD | 50% | Flat session today (+0.25%) — no trend to carry forward |
-| 8 | **BTC/USD** | Bitcoin | HOLD | 50% | Flat session today (-0.21%) — no trend to carry forward |
-| 9 | **ETH/USD** | Ethereum | HOLD | 50% | Flat session today (+0.06%) — no trend to carry forward |
-| 10 | **SOL/USD** | Solana | HOLD | 50% | Flat session today (-0.27%) — no trend to carry forward |
+| 1 | **AAPL** | Apple Inc. | **SELL** | 82% | Moderate negative momentum (-1.64%) — continuation expected |
+| 2 | **NVDA** | NVIDIA Corp. | **SELL** | 76% | Extreme gain today (+4.21%) — mean reversion pullback likely |
+| 3 | **TSLA** | Tesla Inc. | **BUY** | 70% | Extreme loss today (-2.91%) — mean reversion pullback likely |
+| 4 | **MSFT** | Microsoft Corp. | **BUY** | 85% | Moderate positive momentum (+2.50%) — continuation expected |
+| 5 | **AMZN** | Amazon.com Inc. | **SELL** | 85% | Moderate negative momentum (-2.35%) — continuation expected |
+| 6 | **META** | Meta Platforms Inc. | **BUY** | 70% | Extreme loss today (-2.96%) — mean reversion pullback likely |
+| 7 | **SPY** | SPDR S&P 500 ETF | HOLD | 50% | Flat session today (+0.10%) — no trend to carry forward |
+| 8 | **BTC/USD** | Bitcoin | **BUY** | 72% | Extreme loss today (-3.31%) — mean reversion pullback likely |
+| 9 | **ETH/USD** | Ethereum | **SELL** | 82% | Moderate negative momentum (-1.63%) — continuation expected |
+| 10 | **SOL/USD** | Solana | **BUY** | 70% | Extreme loss today (-3.07%) — mean reversion pullback likely |
 
 ---
 
