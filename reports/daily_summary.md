@@ -1,20 +1,20 @@
 # Daily Summary — 2026-06-03
 
 ## 💰 Portfolio
-- Equity: $97,055.65
-- Cash:   $36,304.04
-- Buying power: $128,696.94
-- P&L:    $-1,947.95 (-19.48%)
+- Equity: $96,960.50
+- Cash:   $35,767.00
+- Buying power: $125,907.24
+- P&L:    $-2,043.11 (-20.43%)
 - Trades executed today: 5
 
 ## 🤖 AI Decisions
-- **AAPL** — SELL (conf=0.91) → ✅ APPROVED: Passed all risk checks
-- **NVDA** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **TSLA** — HOLD (conf=0.50) → ❌ REJECTED: Rejected: confidence 0.50 below 0.70.; Rejected: hold signal does not place a trade.
-- **MSFT** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **AMZN** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
-- **META** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **SPY** — SELL (conf=0.74) → ✅ APPROVED: Passed all risk checks
-- **BTC/USD** — SELL (conf=0.96) → ✅ APPROVED: Passed all risk checks
-- **ETH/USD** — SELL (conf=0.75) → ✅ APPROVED: Passed all risk checks
-- **SOL/USD** — SELL (conf=0.99) → ❌ REJECTED: Rejected: no margin allowed; insufficient cash.
+- **NVDA** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **AAPL** — BUY (conf=0.96) → ✅ APPROVED: Passed all risk checks
+- **GOOGL** — BUY (conf=0.81) → ✅ APPROVED: Passed all risk checks
+- **MSFT** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **AMZN** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **AVGO** — BUY (conf=0.75) → ✅ APPROVED: Passed all risk checks
+- **VTI** — BUY (conf=0.79) → ✅ APPROVED: Passed all risk checks
+- **META** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **BTC/USD** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
