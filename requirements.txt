@@ -1,4 +1,5 @@
 alpaca-py>=0.31.0
 python-dotenv>=1.0.1
+yfinance>=0.2.54
 pytest>=8.2.0
 

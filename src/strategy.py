@@ -16,28 +16,51 @@ class StrategySignal:
     reason: str
 
 
-def generate_signal(snapshot: MarketSnapshot) -> StrategySignal:
-    # Simple momentum rule for a first paper-trading iteration.
-    if snapshot.day_change_percent >= 0.4:
+def generate_signal(snapshot: MarketSnapshot, symbol_cfg: dict | None = None) -> StrategySignal:
+    """Bias toward DCA buys on pullbacks in high-quality assets; avoid chasing breakouts."""
+    symbol_cfg = symbol_cfg or {}
+    quality_score = float(symbol_cfg.get("quality_score", 0.6))
+    is_quality = quality_score >= 0.70
+    chg = snapshot.day_change_percent
+    abs_chg = abs(chg)
+
+    if is_quality and chg <= -1.5:
         return StrategySignal(
             symbol=snapshot.symbol,
             action="buy",
-            strength=min(1.0, 0.6 + snapshot.day_change_percent / 5.0),
-            reason="Positive momentum detected",
+            strength=min(1.0, 0.72 + abs_chg / 8.0 + max(0.0, quality_score - 0.7) * 0.2),
+            reason="DCA buy: quality asset on a deep pullback",
         )
-    if snapshot.day_change_percent <= -0.4:
+
+    if is_quality and -1.5 < chg <= -0.3:
+        return StrategySignal(
+            symbol=snapshot.symbol,
+            action="buy",
+            strength=min(0.85, 0.65 + abs_chg / 6.0 + max(0.0, quality_score - 0.7) * 0.15),
+            reason="DCA buy: quality asset on a mild dip",
+        )
+
+    if chg >= 4.0:
         return StrategySignal(
             symbol=snapshot.symbol,
             action="sell",
-            strength=min(1.0, 0.6 + abs(snapshot.day_change_percent) / 5.0),
-            reason="Negative momentum detected",
+            strength=min(1.0, 0.70 + chg / 10.0),
+            reason="Take-profit trim after overextended rally",
+        )
+
+    if not is_quality and chg <= -3.0:
+        return StrategySignal(
+            symbol=snapshot.symbol,
+            action="sell",
+            strength=min(0.95, 0.68 + abs_chg / 10.0),
+            reason="Risk reduction: weak asset in breakdown",
         )
 
     return StrategySignal(
         symbol=snapshot.symbol,
         action="hold",
-        strength=0.5,
-        reason="No strong trend signal",
+        strength=0.55,
+        reason="Wait for better value entry",
     )
 
 

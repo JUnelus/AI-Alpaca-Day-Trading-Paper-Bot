@@ -19,6 +19,7 @@ from .market_data import get_market_snapshots
 from .portfolio import PortfolioState, STATE_FILE, refresh_from_alpaca
 from .risk_manager import RiskManager
 from .strategy import generate_signal, predict_next_day
+from .watchlist_manager import refresh_weekly_watchlist
 
 # ── paths ──────────────────────────────────────────────────────────────────────
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -80,6 +81,9 @@ def run_once() -> dict:
     load_dotenv()
     email_required = str(os.getenv("EMAIL_REQUIRED", "false")).lower() in {"1", "true", "yes"}
 
+    # Refresh once per ISO week so the active 10-symbol basket stays market-value ranked.
+    refresh_weekly_watchlist(WATCHLIST_PATH, limit=10)
+
     config = _load_watchlist()
     symbols: list[dict] = config["symbols"]
     min_confidence = float(os.getenv("MIN_CONFIDENCE", str(config.get("min_confidence", 0.70))))
@@ -140,7 +144,7 @@ def run_once() -> dict:
                 "day_change_percent": snapshot.day_change_percent,
                 "prediction": predict_next_day(
                     snapshot,
-                    generate_signal(snapshot),
+                    generate_signal(snapshot, sym_cfg),
                 ),
             }
             results.append(
@@ -153,7 +157,7 @@ def run_once() -> dict:
             )
             continue
 
-        signal = generate_signal(snapshot)
+        signal = generate_signal(snapshot, sym_cfg)
 
         # Gate SELL signals based on long-only mode and current held position.
         if signal.action == "sell":
@@ -178,7 +182,17 @@ def run_once() -> dict:
                 continue
             # held_qty > 0 → long position exists; allow sell-to-close
 
-        qty = _calc_qty(snapshot.last_price, asset_type, max_pos_value)
+        dca_position_value = max_pos_value
+        if signal.action == "buy" and "dca buy" in signal.reason.lower():
+            # Stage into positions gradually to lower average cost over time.
+            dca_position_value = max_pos_value * 0.35
+
+        qty = _calc_qty(snapshot.last_price, asset_type, dca_position_value)
+        if signal.action == "sell":
+            held_qty = held_qty_map.get(sym, 0.0)
+            if held_qty > 0:
+                # Never sell more than the current long quantity in long-only mode.
+                qty = min(qty, held_qty)
         decision = build_decision(signal, last_price=snapshot.last_price, default_qty=qty).to_dict()
 
         risk = risk_manager.evaluate(
