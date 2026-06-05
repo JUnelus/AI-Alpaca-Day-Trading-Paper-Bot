@@ -1,20 +1,20 @@
-# Daily Summary — 2026-06-04
+# Daily Summary — 2026-06-05
 
 ## 💰 Portfolio
-- Equity: $97,060.68
-- Cash:   $36,480.91
-- Buying power: $257,572.70
-- P&L:    $-1,873.55 (-18.74%)
-- Trades executed today: 2
+- Equity: $96,022.67
+- Cash:   $35,037.26
+- Buying power: $247,533.26
+- P&L:    $-2,923.02 (-29.23%)
+- Trades executed today: 8
 
 ## 🤖 AI Decisions
-- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **NVDA** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
 - **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **GOOGL** — BUY (conf=0.83) → ✅ APPROVED: Passed all risk checks
+- **MSFT** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
+- **AMZN** — BUY (conf=0.75) → ✅ APPROVED: Passed all risk checks
+- **VTI** — BUY (conf=0.83) → ✅ APPROVED: Passed all risk checks
 - **AVGO** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **BTC/USD** — BUY (conf=0.84) → ✅ APPROVED: Passed all risk checks
-- **LLY** — HOLD (conf=0.00) → ❌ REJECTED: No position to sell.
+- **META** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **BTC/USD** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
