@@ -100,7 +100,7 @@ python -m src.main                   # run one full cycle
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-06-15 22:02 UTC &nbsp;|&nbsp; **Trades today:** 2 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-06-16 15:26 UTC &nbsp;|&nbsp; **Trades today:** 4 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -109,55 +109,57 @@ python -m src.main                   # run one full cycle
 | Metric | Value |
 |:-------|------:|
 | 🏦 Starting Balance  | `$10,000.00` |
-| 💵 Current Equity    | `$95,750.10` |
-| 💸 Cash Available    | `$6,163.60` |
-| 🧾 Buying Power      | `$246,355.53` |
-| 🔴 Total P&L | `$-3,196.19` &nbsp; `(-31.96%)` |
+| 💵 Current Equity    | `$95,178.99` |
+| 💸 Cash Available    | `$5,305.17` |
+| 🧾 Buying Power      | `$242,823.12` |
+| 🔴 Total P&L | `$-3,745.78` &nbsp; `(-37.46%)` |
 
 ### 📝 Daily Trade Summary
 
-- **Startup-to-date Total P&L:** `$-3,196.19` (-31.96%)
-- **Yesterday-to-today P&L:** `+$2,285.00`
+- **Startup-to-date Total P&L:** `$-3,745.78` (-37.46%)
+- **Yesterday-to-today P&L:** `$-549.59`
 - **Executed today (with AI reasoning):**
 
 | Symbol | Action | Confidence | AI Reasoning |
 |:-------|:------:|-----------:|:-------------|
-| **META** | SELL | 100% | Take-profit trim after overextended rally |
-| **LLY** | BUY | 72% | DCA buy: quality asset on a mild dip |
+| **NVDA** | BUY | 85% | DCA buy: quality asset on a mild dip |
+| **MSFT** | BUY | 96% | DCA buy: quality asset on a deep pullback |
+| **AVGO** | BUY | 100% | DCA buy: quality asset on a deep pullback |
+| **BTC/USD** | BUY | 78% | DCA buy: quality asset on a mild dip |
 
 ### 📈 Open Positions
 
 | Symbol | Type | Qty | Avg Cost | Price | Mkt Value | Unrealized P&L | P&L % |
 |:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|
-| **AAPL** | STOCK | 52.00 | $308.82 | $296.08 | $15,396.16 | 🔴 $-662.25 | -4.12% |
-| **AMZN** | STOCK | 20.00 | $243.99 | $248.40 | $4,968.00 | 🟢 +$88.13 | +1.81% |
-| **AVGO** | STOCK | 11.00 | $393.05 | $394.85 | $4,343.35 | 🟢 +$19.83 | +0.46% |
-| **BTC/USD** | CRYPTO | 0.0255 | $73,953.69 | $66,422.05 | $1,697.06 | 🔴 $-192.43 | -10.18% |
-| **ETH/USD** | STOCK | 0.6272 | $2,122.30 | $1,811.90 | $1,136.50 | 🔴 $-194.70 | -14.63% |
-| **GOOGL** | STOCK | 7.0000 | $361.34 | $370.00 | $2,590.00 | 🟢 +$60.65 | +2.40% |
-| **LLY** | STOCK | 4.0000 | $1,148.32 | $1,130.90 | $4,523.60 | 🔴 $-69.67 | -1.52% |
-| **META** | STOCK | 12.00 | $596.84 | $593.50 | $7,122.00 | 🔴 $-40.09 | -0.56% |
-| **MSFT** | STOCK | 16.00 | $422.42 | $399.75 | $6,396.00 | 🔴 $-362.66 | -5.37% |
-| **NVDA** | STOCK | 100.00 | $223.97 | $212.10 | $21,210.00 | 🔴 $-1,187.39 | -5.30% |
-| **SOL/USD** | STOCK | 15.42 | $86.15 | $74.29 | $1,145.46 | 🔴 $-182.92 | -13.77% |
-| **SPY** | STOCK | 6.0000 | $745.44 | $754.64 | $4,527.84 | 🟢 +$55.18 | +1.23% |
-| **TSLA** | STOCK | 24.00 | $432.23 | $409.26 | $9,822.16 | 🔴 $-551.41 | -5.32% |
-| **VTI** | ETF | 4.0000 | $366.61 | $372.49 | $1,489.95 | 🟢 +$23.52 | +1.60% |
+| **AAPL** | STOCK | 52.00 | $308.82 | $298.32 | $15,512.64 | 🔴 $-545.77 | -3.40% |
+| **AMZN** | STOCK | 20.00 | $243.99 | $248.92 | $4,978.40 | 🟢 +$98.53 | +2.02% |
+| **AVGO** | STOCK | 12.00 | $391.94 | $379.70 | $4,556.46 | 🔴 $-146.83 | -3.12% |
+| **BTC/USD** | CRYPTO | 0.0335 | $72,003.08 | $65,744.56 | $2,204.39 | 🔴 $-209.85 | -8.69% |
+| **ETH/USD** | STOCK | 0.6272 | $2,122.30 | $1,776.85 | $1,114.51 | 🔴 $-216.68 | -16.28% |
+| **GOOGL** | STOCK | 7.0000 | $361.34 | $375.39 | $2,627.73 | 🟢 +$98.38 | +3.89% |
+| **LLY** | STOCK | 5.0000 | $1,147.65 | $1,128.06 | $5,640.30 | 🔴 $-97.97 | -1.71% |
+| **META** | STOCK | 10.00 | $594.97 | $597.80 | $5,978.05 | 🟢 +$28.32 | +0.48% |
+| **MSFT** | STOCK | 16.00 | $422.42 | $393.81 | $6,300.88 | 🔴 $-457.78 | -6.77% |
+| **NVDA** | STOCK | 100.00 | $223.97 | $208.97 | $20,897.00 | 🔴 $-1,500.39 | -6.70% |
+| **SOL/USD** | STOCK | 15.42 | $86.15 | $73.07 | $1,126.65 | 🔴 $-201.73 | -15.19% |
+| **SPY** | STOCK | 6.0000 | $745.44 | $752.61 | $4,515.67 | 🟢 +$43.01 | +0.96% |
+| **TSLA** | STOCK | 24.00 | $432.23 | $404.87 | $9,716.88 | 🔴 $-656.69 | -6.33% |
+| **VTI** | ETF | 4.0000 | $366.61 | $371.52 | $1,486.08 | 🟢 +$19.65 | +1.34% |
 
 ### 🎯 Watchlist — 10 Symbols
 
 | # | Symbol | Name | Type | Last Price | Day Change | Signal | Confidence |
 |--:|:-------|:-----|:----:|-----------:|-----------:|:------:|:----------:|
-| 1 | **NVDA** | NVIDIA Corp. | STOCK | $212.45 | 🟢 +3.54% | HOLD | — |
-| 2 | **GOOGL** | Alphabet Inc. | STOCK | $369.35 | 🟢 +2.69% | HOLD | — |
-| 3 | **AAPL** | Apple Inc. | STOCK | $296.42 | 🟢 +1.82% | HOLD | — |
-| 4 | **MSFT** | Microsoft Corp. | STOCK | $399.76 | 🟢 +2.31% | HOLD | — |
-| 5 | **AMZN** | Amazon.com Inc. | STOCK | $246.02 | 🟢 +3.13% | HOLD | — |
-| 6 | **VTI** | Vanguard Total Stock Market ETF | ETF | $372.53 | 🟢 +1.68% | HOLD | — |
-| 7 | **AVGO** | Broadcom Inc. | STOCK | $393.94 | 🟢 +3.11% | HOLD | — |
-| 8 | **META** | Meta Platforms Inc. | STOCK | $593.48 | 🟢 +4.67% | **SELL** | 100% |
-| 9 | **BTC/USD** | Bitcoin | CRYPTO | $66,384.63 | 🟢 +1.04% | HOLD | — |
-| 10 | **LLY** | Eli Lilly and Co. | STOCK | $1,129.35 | 🔴 -0.32% | **BUY** | 72% |
+| 1 | **NVDA** | NVIDIA Corp. | STOCK | $209.29 | 🔴 -1.49% | **BUY** | 85% |
+| 2 | **GOOGL** | Alphabet Inc. | STOCK | $375.63 | 🟢 +1.70% | HOLD | — |
+| 3 | **AAPL** | Apple Inc. | STOCK | $298.20 | 🟢 +0.60% | HOLD | — |
+| 4 | **MSFT** | Microsoft Corp. | STOCK | $393.75 | 🔴 -1.50% | **BUY** | 96% |
+| 5 | **AMZN** | Amazon.com Inc. | STOCK | $248.95 | 🟢 +1.19% | HOLD | — |
+| 6 | **VTI** | Vanguard Total Stock Market ETF | ETF | $371.74 | 🔴 -0.21% | HOLD | — |
+| 7 | **AVGO** | Broadcom Inc. | STOCK | $380.77 | 🔴 -3.34% | **BUY** | 100% |
+| 8 | **META** | Meta Platforms Inc. | STOCK | $598.40 | 🟢 +0.83% | HOLD | — |
+| 9 | **BTC/USD** | Bitcoin | CRYPTO | $65,769.41 | 🔴 -0.78% | **BUY** | 78% |
+| 10 | **LLY** | Eli Lilly and Co. | STOCK | $1,128.62 | 🔴 -0.06% | HOLD | — |
 
 ---
 
@@ -167,16 +169,16 @@ python -m src.main                   # run one full cycle
 
 | # | Symbol | Name | Predicted Action | Confidence | Basis |
 |--:|:-------|:-----|:----------------:|-----------:|:------|
-| 1 | **NVDA** | NVIDIA Corp. | **SELL** | 73% | Extreme gain today (+3.54%) — mean reversion pullback likely |
-| 2 | **GOOGL** | Alphabet Inc. | **SELL** | 68% | Extreme gain today (+2.69%) — mean reversion pullback likely |
-| 3 | **AAPL** | Apple Inc. | **BUY** | 48% | Moderate positive momentum (+1.82%) — continuation expected |
-| 4 | **MSFT** | Microsoft Corp. | **BUY** | 48% | Moderate positive momentum (+2.31%) — continuation expected |
-| 5 | **AMZN** | Amazon.com Inc. | **SELL** | 71% | Extreme gain today (+3.13%) — mean reversion pullback likely |
-| 6 | **VTI** | Vanguard Total Stock Market ETF | **BUY** | 48% | Moderate positive momentum (+1.68%) — continuation expected |
-| 7 | **AVGO** | Broadcom Inc. | **SELL** | 71% | Extreme gain today (+3.11%) — mean reversion pullback likely |
-| 8 | **META** | Meta Platforms Inc. | **SELL** | 78% | Extreme gain today (+4.67%) — mean reversion pullback likely |
-| 9 | **BTC/USD** | Bitcoin | **BUY** | 48% | Moderate positive momentum (+1.04%) — continuation expected |
-| 10 | **LLY** | Eli Lilly and Co. | HOLD | 50% | Flat session today (-0.32%) — no trend to carry forward |
+| 1 | **NVDA** | NVIDIA Corp. | **SELL** | 75% | Moderate negative momentum (-1.49%) — continuation expected |
+| 2 | **GOOGL** | Alphabet Inc. | **BUY** | 48% | Moderate positive momentum (+1.70%) — continuation expected |
+| 3 | **AAPL** | Apple Inc. | **BUY** | 48% | Moderate positive momentum (+0.60%) — continuation expected |
+| 4 | **MSFT** | Microsoft Corp. | **SELL** | 84% | Moderate negative momentum (-1.50%) — continuation expected |
+| 5 | **AMZN** | Amazon.com Inc. | **BUY** | 48% | Moderate positive momentum (+1.19%) — continuation expected |
+| 6 | **VTI** | Vanguard Total Stock Market ETF | HOLD | 50% | Flat session today (-0.21%) — no trend to carry forward |
+| 7 | **AVGO** | Broadcom Inc. | **BUY** | 72% | Extreme loss today (-3.34%) — mean reversion pullback likely |
+| 8 | **META** | Meta Platforms Inc. | **BUY** | 48% | Moderate positive momentum (+0.83%) — continuation expected |
+| 9 | **BTC/USD** | Bitcoin | **SELL** | 69% | Moderate negative momentum (-0.78%) — continuation expected |
+| 10 | **LLY** | Eli Lilly and Co. | HOLD | 50% | Flat session today (-0.06%) — no trend to carry forward |
 
 ---
 
