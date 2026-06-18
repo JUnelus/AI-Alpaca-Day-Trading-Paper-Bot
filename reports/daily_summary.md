@@ -1,20 +1,20 @@
-# Daily Summary — 2026-06-17
+# Daily Summary — 2026-06-18
 
 ## 💰 Portfolio
-- Equity: $93,696.94
-- Cash:   $-1,528.62
-- Buying power: $223,324.34
-- P&L:    $-5,189.74 (-51.90%)
-- Trades executed today: 10
+- Equity: $93,830.56
+- Cash:   $-4,821.50
+- Buying power: $221,478.38
+- P&L:    $-5,069.73 (-50.70%)
+- Trades executed today: 2
 
 ## 🤖 AI Decisions
-- **NVDA** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
-- **GOOGL** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **AAPL** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
-- **MSFT** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **AMZN** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **VTI** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
-- **AVGO** — SELL (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **META** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **BTC/USD** — BUY (conf=0.99) → ✅ APPROVED: Passed all risk checks
-- **LLY** — BUY (conf=0.82) → ✅ APPROVED: Passed all risk checks
+- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AVGO** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **BTC/USD** — BUY (conf=0.80) → ✅ APPROVED: Passed all risk checks
+- **LLY** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
