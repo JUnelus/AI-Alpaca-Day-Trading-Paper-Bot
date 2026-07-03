@@ -1,8 +1,8 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 95407.96,
+  "account_equity": 95564.45,
   "cash": -29774.81,
-  "buying_power": 180202.6,
+  "buying_power": 178508.15,
   "positions": [
     {
       "symbol": "AAPL",
@@ -39,20 +39,20 @@
       "asset_type": "crypto",
       "qty": 0.194684947,
       "avg_entry_price": 63955.478945468,
-      "current_price": 61879.51,
-      "market_value": 12047.009125,
-      "unrealized_pnl": -404.159904,
-      "unrealized_pnl_pct": -3.2459595003752595
+      "current_price": 62471.48,
+      "market_value": 12162.256773,
+      "unrealized_pnl": -288.912256,
+      "unrealized_pnl_pct": -2.320362492312076
     },
     {
       "symbol": "ETH/USD",
       "asset_type": "stock",
       "qty": 0.62724,
       "avg_entry_price": 2122.3,
-      "current_price": 1732.6,
-      "market_value": 1086.756024,
-      "unrealized_pnl": -244.435428,
-      "unrealized_pnl_pct": -18.362154266597557
+      "current_price": 1761.722,
+      "market_value": 1105.022507,
+      "unrealized_pnl": -226.168945,
+      "unrealized_pnl_pct": -16.989963739640956
     },
     {
       "symbol": "GOOGL",
@@ -109,10 +109,10 @@
       "asset_type": "stock",
       "qty": 15.41877525,
       "avg_entry_price": 86.153446599,
-      "current_price": 80.89,
-      "market_value": 1247.22473,
-      "unrealized_pnl": -81.1559,
-      "unrealized_pnl_pct": -6.109385981674103
+      "current_price": 82.38,
+      "market_value": 1270.198705,
+      "unrealized_pnl": -58.181925,
+      "unrealized_pnl_pct": -4.379913684424842
     },
     {
       "symbol": "SPY",
@@ -145,10 +145,10 @@
       "unrealized_pnl_pct": 0.705071499863419
     }
   ],
-  "total_pnl": -3296.278987,
-  "total_pnl_pct": -32.96278987,
+  "total_pnl": -3139.790881,
+  "total_pnl_pct": -31.397908809999997,
   "yesterday_total_pnl": -3583.723563,
   "yesterday_equity": 95184.28,
-  "last_updated": "2026-07-03T14:31:56.710606+00:00",
+  "last_updated": "2026-07-03T21:38:55.988836+00:00",
   "trades_today": 5
 }
