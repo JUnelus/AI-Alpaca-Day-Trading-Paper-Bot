@@ -100,7 +100,7 @@ python -m src.main                   # run one full cycle
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-07-02 21:40 UTC &nbsp;|&nbsp; **Trades today:** 5 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-07-03 14:31 UTC &nbsp;|&nbsp; **Trades today:** 5 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -109,15 +109,15 @@ python -m src.main                   # run one full cycle
 | Metric | Value |
 |:-------|------:|
 | 🏦 Starting Balance  | `$10,000.00` |
-| 💵 Current Equity    | `$95,184.28` |
-| 💸 Cash Available    | `$-29,774.79` |
-| 🧾 Buying Power      | `$181,580.41` |
-| 🔴 Total P&L | `$-3,583.72` &nbsp; `(-35.84%)` |
+| 💵 Current Equity    | `$95,407.96` |
+| 💸 Cash Available    | `$-29,774.81` |
+| 🧾 Buying Power      | `$180,202.60` |
+| 🔴 Total P&L | `$-3,296.28` &nbsp; `(-32.96%)` |
 
 ### 📝 Daily Trade Summary
 
-- **Startup-to-date Total P&L:** `$-3,583.72` (-35.84%)
-- **Yesterday-to-today P&L:** `$-111.66`
+- **Startup-to-date Total P&L:** `$-3,296.28` (-32.96%)
+- **Yesterday-to-today P&L:** `+$287.44`
 - **Executed today (with AI reasoning):**
 
 | Symbol | Action | Confidence | AI Reasoning |
@@ -132,20 +132,20 @@ python -m src.main                   # run one full cycle
 
 | Symbol | Type | Qty | Avg Cost | Price | Mkt Value | Unrealized P&L | P&L % |
 |:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|
-| **AAPL** | STOCK | 60.00 | $305.99 | $308.07 | $18,484.20 | 🟢 +$124.74 | +0.68% |
-| **AMZN** | STOCK | 28.00 | $237.74 | $242.75 | $6,797.00 | 🟢 +$140.36 | +2.11% |
-| **AVGO** | STOCK | 11.00 | $378.26 | $360.30 | $3,963.30 | 🔴 $-197.55 | -4.75% |
-| **BTC/USD** | CRYPTO | 0.1947 | $63,955.48 | $61,415.57 | $11,956.69 | 🔴 $-494.48 | -3.97% |
-| **ETH/USD** | STOCK | 0.6272 | $2,122.30 | $1,699.40 | $1,065.93 | 🔴 $-265.26 | -19.93% |
-| **GOOGL** | STOCK | 13.00 | $350.09 | $358.91 | $4,665.83 | 🟢 +$114.72 | +2.52% |
-| **LLY** | STOCK | 14.00 | $1,143.08 | $1,212.70 | $16,977.80 | 🟢 +$974.70 | +6.09% |
-| **META** | STOCK | 15.00 | $571.93 | $583.00 | $8,745.00 | 🟢 +$166.12 | +1.94% |
-| **MSFT** | STOCK | 22.00 | $393.63 | $390.28 | $8,586.16 | 🔴 $-73.75 | -0.85% |
-| **NVDA** | STOCK | 126.00 | $218.95 | $194.47 | $24,503.22 | 🔴 $-3,084.70 | -11.18% |
-| **SOL/USD** | STOCK | 15.42 | $86.15 | $81.01 | $1,249.09 | 🔴 $-79.29 | -5.97% |
-| **SPY** | STOCK | 6.0000 | $745.44 | $744.42 | $4,466.52 | 🔴 $-6.14 | -0.14% |
-| **TSLA** | STOCK | 24.00 | $432.23 | $393.42 | $9,442.08 | 🔴 $-931.49 | -8.98% |
-| **VTI** | ETF | 11.00 | $366.18 | $368.75 | $4,056.25 | 🟢 +$28.29 | +0.70% |
+| **AAPL** | STOCK | 60.00 | $305.99 | $308.63 | $18,517.80 | 🟢 +$158.34 | +0.86% |
+| **AMZN** | STOCK | 28.00 | $237.74 | $242.67 | $6,794.76 | 🟢 +$138.12 | +2.07% |
+| **AVGO** | STOCK | 11.00 | $378.26 | $360.45 | $3,964.95 | 🔴 $-195.90 | -4.71% |
+| **BTC/USD** | CRYPTO | 0.1947 | $63,955.48 | $61,879.51 | $12,047.01 | 🔴 $-404.16 | -3.25% |
+| **ETH/USD** | STOCK | 0.6272 | $2,122.30 | $1,732.60 | $1,086.76 | 🔴 $-244.44 | -18.36% |
+| **GOOGL** | STOCK | 13.00 | $350.09 | $359.91 | $4,678.83 | 🟢 +$127.72 | +2.81% |
+| **LLY** | STOCK | 14.00 | $1,143.08 | $1,213.91 | $16,994.74 | 🟢 +$991.64 | +6.20% |
+| **META** | STOCK | 15.00 | $567.68 | $582.90 | $8,743.50 | 🟢 +$228.36 | +2.68% |
+| **MSFT** | STOCK | 22.00 | $393.63 | $390.49 | $8,590.78 | 🔴 $-69.13 | -0.80% |
+| **NVDA** | STOCK | 126.00 | $218.95 | $194.83 | $24,548.58 | 🔴 $-3,039.34 | -11.02% |
+| **SOL/USD** | STOCK | 15.42 | $86.15 | $80.89 | $1,247.22 | 🔴 $-81.16 | -6.11% |
+| **SPY** | STOCK | 6.0000 | $745.44 | $744.78 | $4,468.68 | 🔴 $-3.98 | -0.09% |
+| **TSLA** | STOCK | 24.00 | $432.23 | $393.45 | $9,442.80 | 🔴 $-930.77 | -8.97% |
+| **VTI** | ETF | 11.00 | $366.18 | $368.76 | $4,056.36 | 🟢 +$28.40 | +0.71% |
 
 ### 🎯 Watchlist — 10 Symbols
 
@@ -159,7 +159,7 @@ python -m src.main                   # run one full cycle
 | 6 | **VTI** | Vanguard Total Stock Market ETF | ETF | $368.76 | 🔴 -0.14% | HOLD | — |
 | 7 | **AVGO** | Broadcom Inc. | STOCK | $360.45 | 🔴 -2.41% | **BUY** | 100% |
 | 8 | **META** | Meta Platforms Inc. | STOCK | $582.90 | 🔴 -4.90% | **BUY** | 100% |
-| 9 | **BTC/USD** | Bitcoin | CRYPTO | $61,466.90 | 🟢 +2.50% | HOLD | — |
+| 9 | **BTC/USD** | Bitcoin | CRYPTO | $61,817.55 | 🟢 +0.53% | HOLD | — |
 | 10 | **LLY** | Eli Lilly and Co. | STOCK | $1,213.91 | 🟢 +1.86% | HOLD | — |
 
 ---
@@ -178,7 +178,7 @@ python -m src.main                   # run one full cycle
 | 6 | **VTI** | Vanguard Total Stock Market ETF | HOLD | 50% | Flat session today (-0.14%) — no trend to carry forward |
 | 7 | **AVGO** | Broadcom Inc. | **SELL** | 85% | Moderate negative momentum (-2.41%) — continuation expected |
 | 8 | **META** | Meta Platforms Inc. | **BUY** | 78% | Extreme loss today (-4.90%) — mean reversion pullback likely |
-| 9 | **BTC/USD** | Bitcoin | **SELL** | 68% | Extreme gain today (+2.50%) — mean reversion pullback likely |
+| 9 | **BTC/USD** | Bitcoin | **BUY** | 48% | Moderate positive momentum (+0.53%) — continuation expected |
 | 10 | **LLY** | Eli Lilly and Co. | **BUY** | 48% | Moderate positive momentum (+1.86%) — continuation expected |
 
 ---

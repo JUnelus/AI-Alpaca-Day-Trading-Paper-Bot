@@ -1,10 +1,10 @@
-# Daily Summary — 2026-07-02
+# Daily Summary — 2026-07-03
 
 ## 💰 Portfolio
-- Equity: $95,184.28
-- Cash:   $-29,774.79
-- Buying power: $181,580.41
-- P&L:    $-3,583.72 (-35.84%)
+- Equity: $95,407.96
+- Cash:   $-29,774.81
+- Buying power: $180,202.60
+- P&L:    $-3,296.28 (-32.96%)
 - Trades executed today: 5
 
 ## 🤖 AI Decisions
