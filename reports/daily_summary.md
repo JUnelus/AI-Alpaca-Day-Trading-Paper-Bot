@@ -1,20 +1,20 @@
 # Daily Summary — 2026-07-28
 
 ## 💰 Portfolio
-- Equity: $94,348.56
-- Cash:   $-79,806.35
-- Buying power: $105,865.80
-- P&L:    $+10,203.98 (+102.04%)
-- Trades executed today: 3
+- Equity: $95,422.08
+- Cash:   $-81,028.49
+- Buying power: $107,468.90
+- P&L:    $+11,277.50 (+112.77%)
+- Trades executed today: 1
 
 ## 🤖 AI Decisions
 - **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **NVDA** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
+- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
 - **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
 - **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AMZN** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
+- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
 - **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AVGO** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
+- **AVGO** — BUY (conf=0.77) → ✅ APPROVED: Passed all risk checks
 - **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **BTC/USD** — BUY (conf=0.81) → ✅ APPROVED: Passed all risk checks
+- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
 - **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
