@@ -1,117 +1,117 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 94401.14,
-  "cash": -87649.57,
-  "buying_power": 93890.5,
+  "account_equity": 94283.79,
+  "cash": -86068.04,
+  "buying_power": 95579.63,
   "positions": [
     {
       "symbol": "AAPL",
       "asset_type": "stock",
       "qty": 55.0,
       "avg_entry_price": 307.976636,
-      "current_price": 330.92,
-      "market_value": 18200.6,
-      "unrealized_pnl": 1261.88502,
-      "unrealized_pnl_pct": 7.449709269504456
+      "current_price": 308.9379,
+      "market_value": 16991.5845,
+      "unrealized_pnl": 52.86952,
+      "unrealized_pnl_pct": 0.31212237801051895
     },
     {
       "symbol": "AMZN",
       "asset_type": "stock",
-      "qty": 62.0,
+      "qty": 56.0,
       "avg_entry_price": 239.071935,
-      "current_price": 237.8,
-      "market_value": 14743.6,
-      "unrealized_pnl": -78.85997,
-      "unrealized_pnl_pct": -0.5320302443697543
+      "current_price": 257.5828,
+      "market_value": 14424.6368,
+      "unrealized_pnl": 1036.60844,
+      "unrealized_pnl_pct": 7.742801345544804
     },
     {
       "symbol": "AVGO",
       "asset_type": "stock",
-      "qty": 20.0,
+      "qty": 17.0,
       "avg_entry_price": 379.1815,
-      "current_price": 386.905,
-      "market_value": 7738.1,
-      "unrealized_pnl": 154.47,
-      "unrealized_pnl_pct": 2.036887348143303
+      "current_price": 388.75,
+      "market_value": 6608.75,
+      "unrealized_pnl": 162.6645,
+      "unrealized_pnl_pct": 2.523461719519544
     },
     {
       "symbol": "BTC/USD",
       "asset_type": "crypto",
       "qty": 0.277776697,
       "avg_entry_price": 18884.840289267,
-      "current_price": 64810.54,
-      "market_value": 18002.857732,
-      "unrealized_pnl": 12757.089173,
-      "unrealized_pnl_pct": 243.18818166873152
+      "current_price": 64651.42,
+      "market_value": 17958.657904,
+      "unrealized_pnl": 12712.889345,
+      "unrealized_pnl_pct": 242.34560107251366
     },
     {
       "symbol": "ETH/USD",
       "asset_type": "stock",
       "qty": 0.62724,
       "avg_entry_price": 0.0,
-      "current_price": 1914.5,
-      "market_value": 1200.85098,
-      "unrealized_pnl": 1200.85098,
+      "current_price": 1920.85,
+      "market_value": 1204.833954,
+      "unrealized_pnl": 1204.833954,
       "unrealized_pnl_pct": 0.0
     },
     {
       "symbol": "GOOGL",
       "asset_type": "stock",
-      "qty": 28.0,
-      "avg_entry_price": 352.998929,
-      "current_price": 332.67,
-      "market_value": 9314.76,
-      "unrealized_pnl": -569.210012,
-      "unrealized_pnl_pct": -5.758920871966725
+      "qty": 29.0,
+      "avg_entry_price": 352.298276,
+      "current_price": 333.95,
+      "market_value": 9684.55,
+      "unrealized_pnl": -532.100004,
+      "unrealized_pnl_pct": -5.208165140155271
     },
     {
       "symbol": "LLY",
       "asset_type": "stock",
-      "qty": 28.0,
-      "avg_entry_price": 1162.529643,
-      "current_price": 1161.73,
-      "market_value": 32528.44,
-      "unrealized_pnl": -22.390004,
-      "unrealized_pnl_pct": -0.0687847406571464
+      "qty": 29.0,
+      "avg_entry_price": 1162.513793,
+      "current_price": 1157.69,
+      "market_value": 33573.01,
+      "unrealized_pnl": -139.889997,
+      "unrealized_pnl_pct": -0.41494501218361024
     },
     {
       "symbol": "META",
       "asset_type": "stock",
-      "qty": 26.0,
-      "avg_entry_price": 598.211538,
-      "current_price": 530.74,
-      "market_value": 13799.24,
-      "unrealized_pnl": -1754.259988,
-      "unrealized_pnl_pct": -11.27887606875279
+      "qty": 27.0,
+      "avg_entry_price": 595.715185,
+      "current_price": 540.45,
+      "market_value": 14592.15,
+      "unrealized_pnl": -1492.159995,
+      "unrealized_pnl_pct": -9.277115371836626
     },
     {
       "symbol": "MSFT",
       "asset_type": "stock",
-      "qty": 34.0,
+      "qty": 31.0,
       "avg_entry_price": 392.639118,
-      "current_price": 450.315,
-      "market_value": 15310.71,
-      "unrealized_pnl": 1960.979988,
-      "unrealized_pnl_pct": 14.689285747631494
+      "current_price": 447.1,
+      "market_value": 13860.1,
+      "unrealized_pnl": 1688.287342,
+      "unrealized_pnl_pct": 13.870467689874955
     },
     {
       "symbol": "NVDA",
       "asset_type": "stock",
       "qty": 157.0,
       "avg_entry_price": 214.301552,
-      "current_price": 196.84,
-      "market_value": 30903.88,
-      "unrealized_pnl": -2741.463664,
-      "unrealized_pnl_pct": -8.148122044398447
+      "current_price": 195.89,
+      "market_value": 30754.73,
+      "unrealized_pnl": -2890.613664,
+      "unrealized_pnl_pct": -8.591422613682239
     },
     {
       "symbol": "SOL/USD",
       "asset_type": "stock",
       "qty": 15.41877525,
       "avg_entry_price": 0.0,
-      "current_price": 74.1251,
-      "market_value": 1142.918257,
-      "unrealized_pnl": 1142.918257,
+      "current_price": 74.25,
+      "market_value": 1144.844062,
+      "unrealized_pnl": 1144.844062,
       "unrealized_pnl_pct": 0.0
     },
     {
@@ -119,36 +119,36 @@
       "asset_type": "stock",
       "qty": 6.0,
       "avg_entry_price": 745.443333,
-      "current_price": 738.57,
-      "market_value": 4431.42,
-      "unrealized_pnl": -41.239998,
-      "unrealized_pnl_pct": -0.9220463441987748
+      "current_price": 741.7463,
+      "market_value": 4450.4778,
+      "unrealized_pnl": -22.182198,
+      "unrealized_pnl_pct": -0.49595091086554793
     },
     {
       "symbol": "TSLA",
       "asset_type": "stock",
       "qty": 24.0,
       "avg_entry_price": 432.232083,
-      "current_price": 308.6523,
-      "market_value": 7407.6552,
-      "unrealized_pnl": -2965.914792,
-      "unrealized_pnl_pct": -28.591071292595373
+      "current_price": 308.8,
+      "market_value": 7411.2,
+      "unrealized_pnl": -2962.369992,
+      "unrealized_pnl_pct": -28.556899835683875
     },
     {
       "symbol": "VTI",
       "asset_type": "etf",
       "qty": 21.0,
       "avg_entry_price": 366.899524,
-      "current_price": 364.6,
-      "market_value": 7656.6,
-      "unrealized_pnl": -48.290004,
-      "unrealized_pnl_pct": -0.626744885065591
+      "current_price": 366.3,
+      "market_value": 7692.3,
+      "unrealized_pnl": -12.590004,
+      "unrealized_pnl_pct": -0.16340277399760267
     }
   ],
-  "total_pnl": 10256.564986,
-  "total_pnl_pct": 102.56564985999998,
+  "total_pnl": 9951.091309,
+  "total_pnl_pct": 99.51091309,
   "yesterday_total_pnl": 7114.295057999999,
   "yesterday_equity": 91253.25,
-  "last_updated": "2026-07-30T14:31:42.898381+00:00",
-  "trades_today": 7
+  "last_updated": "2026-07-30T21:39:26.023371+00:00",
+  "trades_today": 6
 }
