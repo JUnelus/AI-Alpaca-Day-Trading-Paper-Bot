@@ -1270,3 +1270,13 @@
 2026-08-05T21:39:31.800024+00:00,META,hold,0.55,1.0,2.0,588.77,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
 2026-08-05T21:39:31.800113+00:00,BTC/USD,hold,0.55,1.0,0.0232,64637.51,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
 2026-08-05T21:39:31.800244+00:00,LLY,sell,1.0,1.0,1.0,1181.56,True,Approved
+2026-08-06T14:32:54.294981+00:00,NVDA,hold,0.55,1.0,6.0,219.6,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.295121+00:00,AAPL,hold,0.55,1.0,4.0,312.91,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.295219+00:00,GOOGL,buy,0.7710520652263895,1.0,1.0,356.85,True,Approved
+2026-08-06T14:32:54.387893+00:00,MSFT,hold,0.55,1.0,3.0,496.45,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.388004+00:00,AMZN,hold,0.55,1.0,5.0,273.32,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.388101+00:00,VTI,hold,0.55,1.0,3.0,380.21,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.388188+00:00,AVGO,hold,0.55,1.0,3.0,424.3,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.388280+00:00,META,hold,0.55,1.0,2.0,590.7,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
+2026-08-06T14:32:54.388380+00:00,BTC/USD,buy,0.7249739835787331,1.0,0.0082,63672.99,True,Approved
+2026-08-06T14:32:54.463367+00:00,LLY,hold,0.55,1.0,1.0,1177.39,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
