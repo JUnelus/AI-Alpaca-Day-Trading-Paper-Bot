@@ -1,20 +1,20 @@
-# Daily Summary — 2026-08-10
+# Daily Summary — 2026-08-11
 
 ## 💰 Portfolio
-- Equity: $106,582.87
-- Cash:   $-83,095.60
-- Buying power: $128,987.46
-- P&L:    $+20,377.38 (+203.77%)
-- Trades executed today: 4
+- Equity: $106,586.51
+- Cash:   $-84,259.28
+- Buying power: $125,913.76
+- P&L:    $+20,382.26 (+203.82%)
+- Trades executed today: 5
 
 ## 🤖 AI Decisions
-- **NVDA** — BUY (conf=1.00) → ✅ APPROVED: Passed all risk checks
-- **AAPL** — BUY (conf=0.97) → ✅ APPROVED: Passed all risk checks
-- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AAPL** — BUY (conf=0.79) → ✅ APPROVED: Passed all risk checks
+- **GOOGL** — BUY (conf=0.97) → ✅ APPROVED: Passed all risk checks
+- **MSFT** — BUY (conf=0.83) → ✅ APPROVED: Passed all risk checks
+- **AMZN** — BUY (conf=0.84) → ✅ APPROVED: Passed all risk checks
 - **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AVGO** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
+- **AVGO** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
 - **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **BTC/USD** — BUY (conf=0.85) → ✅ APPROVED: Passed all risk checks
-- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **LLY** — BUY (conf=0.81) → ✅ APPROVED: Passed all risk checks
