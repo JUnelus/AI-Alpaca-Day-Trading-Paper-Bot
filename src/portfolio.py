@@ -29,11 +29,12 @@ class PositionSnapshot:
     symbol: str
     asset_type: str
     qty: float
-    avg_entry_price: float
-    current_price: float
-    market_value: float
-    unrealized_pnl: float
-    unrealized_pnl_pct: float
+    avg_entry_price: Optional[float]
+    current_price: Optional[float]
+    market_value: Optional[float]
+    cost_basis: Optional[float]
+    unrealized_pnl: Optional[float]
+    unrealized_pnl_pct: Optional[float]
 
 
 @dataclass
@@ -59,6 +60,10 @@ class PortfolioState:
     max_total_exposure: float = 0.0
     warnings: List[str] = field(default_factory=list)
     mode: str = "report"
+    last_scheduled_trade_day: str = ""
+    last_scheduled_report_day: str = ""
+    pnl_data_complete: bool = True
+    unknown_position_pnl_count: int = 0
 
     # ── persistence ────────────────────────────────────────────────────────────
 
@@ -82,35 +87,75 @@ class PortfolioState:
             return cls()
 
 
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_optional_float(value) -> Optional[float]:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def refresh_from_alpaca(
     alpaca_client: "AlpacaClient",
     symbol_type_map: Dict[str, str],
     price_map: Dict[str, float],
     starting_balance: float = STARTING_BALANCE,
     trades_today: int = 0,
+    account_snapshot=None,
 ) -> PortfolioState:
     """Fetch the live Alpaca paper account and build a PortfolioState."""
-    account = alpaca_client.get_account_snapshot()
+    account = account_snapshot or alpaca_client.get_account_snapshot()
     positions_raw = alpaca_client.list_positions()
 
     positions: List[PositionSnapshot] = []
+    unknown_position_pnl_count = 0
     for pos in positions_raw:
         sym = _norm(getattr(pos, "symbol", ""))
-        qty = float(getattr(pos, "qty", 0))
-        avg_entry = float(getattr(pos, "avg_entry_price", 0))
+        qty = _safe_float(getattr(pos, "qty", 0.0))
+
+        raw_cost_basis = _safe_optional_float(getattr(pos, "cost_basis", None))
+        cost_basis = raw_cost_basis if raw_cost_basis is not None and raw_cost_basis > 0 else None
+
+        raw_avg_entry = _safe_optional_float(getattr(pos, "avg_entry_price", None))
+        avg_entry = raw_avg_entry if raw_avg_entry is not None and raw_avg_entry > 0 else None
+        if avg_entry is None and cost_basis is not None and qty > 0:
+            avg_entry = cost_basis / qty
 
         # Prefer Alpaca's own current_price; fall back to price_map snapshot.
-        raw_current = getattr(pos, "current_price", None)
-        current_price = float(raw_current) if raw_current else price_map.get(sym, avg_entry)
+        raw_current = _safe_optional_float(getattr(pos, "current_price", None))
+        current_price = raw_current if raw_current is not None else price_map.get(sym, avg_entry)
+        if current_price is not None and current_price <= 0:
+            current_price = None
 
-        raw_mv = getattr(pos, "market_value", None)
-        mkt_value = float(raw_mv) if raw_mv else qty * current_price
+        raw_mv = _safe_optional_float(getattr(pos, "market_value", None))
+        mkt_value = raw_mv if raw_mv is not None else (qty * current_price if current_price is not None else None)
 
-        raw_pl = getattr(pos, "unrealized_pl", None)
-        unrealized = float(raw_pl) if raw_pl else (current_price - avg_entry) * qty
+        raw_pl = _safe_optional_float(getattr(pos, "unrealized_pl", None))
+        raw_plpc = _safe_optional_float(getattr(pos, "unrealized_plpc", None))
+        if raw_pl is not None:
+            unrealized = raw_pl
+        elif current_price is not None and avg_entry is not None:
+            unrealized = (current_price - avg_entry) * qty
+        else:
+            unrealized = None
 
-        cost_basis = avg_entry * qty
-        unrealized_pct = (unrealized / cost_basis * 100) if cost_basis else 0.0
+        if raw_plpc is not None:
+            unrealized_pct = raw_plpc * 100.0
+        elif unrealized is not None and cost_basis is not None and cost_basis > 0:
+            unrealized_pct = (unrealized / cost_basis) * 100.0
+        else:
+            unrealized_pct = None
+
+        if unrealized is None:
+            unknown_position_pnl_count += 1
 
         asset_type = symbol_type_map.get(sym, "crypto" if "/" in sym else "stock")
         positions.append(
@@ -121,17 +166,16 @@ def refresh_from_alpaca(
                 avg_entry_price=avg_entry,
                 current_price=current_price,
                 market_value=mkt_value,
+                cost_basis=cost_basis,
                 unrealized_pnl=unrealized,
                 unrealized_pnl_pct=unrealized_pct,
             )
         )
 
     equity = account.equity
-    # P&L is calculated against the $10k portfolio budget, not the broker's
-    # default paper balance (Alpaca starts paper accounts at $100k).
-    total_pnl = sum(p.unrealized_pnl for p in positions)
+    total_pnl = sum(p.unrealized_pnl for p in positions if p.unrealized_pnl is not None)
     total_pnl_pct = (total_pnl / starting_balance * 100) if starting_balance else 0.0
-    gross_exposure = sum(abs(p.market_value) for p in positions)
+    gross_exposure = sum(abs(p.market_value) for p in positions if p.market_value is not None)
 
     return PortfolioState(
         starting_balance=starting_balance,
@@ -144,6 +188,8 @@ def refresh_from_alpaca(
         last_updated=datetime.now(timezone.utc).isoformat(),
         trades_today=trades_today,
         gross_exposure=gross_exposure,
+        pnl_data_complete=unknown_position_pnl_count == 0,
+        unknown_position_pnl_count=unknown_position_pnl_count,
     )
 
 

@@ -81,8 +81,7 @@ def _build_html_email(state, executed_trades, open_positions, predictions) -> st
 
     # P&L summary
     equity_color = "green" if state.total_pnl >= 0 else "red"
-    yesterday_delta = state.total_pnl - state.yesterday_total_pnl if state.yesterday_total_pnl is not None else 0.0
-    yesterday_color = "green" if yesterday_delta >= 0 else "red"
+    daily_color = "green" if state.daily_pnl >= 0 else "red"
 
     executed_table = _build_trades_table(executed_trades)
     positions_table = _build_positions_table(open_positions)
@@ -135,31 +134,42 @@ def _build_html_email(state, executed_trades, open_positions, predictions) -> st
             <h2>💰 Account Summary</h2>
             <table>
                 <tr>
-                    <td><strong>Starting Balance</strong></td>
+                    <td><strong>Configured Strategy Budget</strong></td>
                     <td>${state.starting_balance:,.2f}</td>
                 </tr>
                 <tr>
-                    <td><strong>Current Equity</strong></td>
+                    <td><strong>Strategy Max Gross Exposure</strong></td>
+                    <td>${state.max_total_exposure:,.2f}</td>
+                </tr>
+                <tr>
+                    <td><strong>Alpaca Paper Account Equity</strong></td>
                     <td>${state.account_equity:,.2f}</td>
                 </tr>
                 <tr>
-                    <td><strong>Cash Available</strong></td>
+                    <td><strong>Broker Cash Available</strong></td>
                     <td>${state.cash:,.2f}</td>
                 </tr>
                 <tr>
-                    <td><strong>Total P&L (Startup-to-date)</strong></td>
+                    <td><strong>Actual Broker Gross Exposure</strong></td>
+                    <td>${state.gross_exposure:,.2f}</td>
+                </tr>
+                <tr>
+                    <td><strong>{'Broker Position P&L (Partial)' if not state.pnl_data_complete else 'Broker Position P&L'}</strong></td>
                     <td class="{'positive' if state.total_pnl >= 0 else 'negative'}">
                         ${state.total_pnl:+,.2f} ({state.total_pnl_pct:+.2f}%)
                     </td>
                 </tr>
                 <tr>
-                    <td><strong>Yesterday-to-today P&L</strong></td>
-                    <td class="{'positive' if yesterday_delta >= 0 else 'negative'}">
-                        {'Not available yet' if state.yesterday_total_pnl is None else f'${yesterday_delta:+,.2f}'}
+                    <td><strong>Daily P&L (final equity - start of day)</strong></td>
+                    <td class="{'positive' if state.daily_pnl >= 0 else 'negative'}">
+                        ${state.daily_pnl:+,.2f}
                     </td>
                 </tr>
             </table>
         </div>
+
+        {'<p><strong>Legacy account warning:</strong> The current Alpaca paper account contains positions created before the current $10,000 risk controls were enforced.</p>' if state.gross_exposure > state.max_total_exposure else ''}
+        {'<p><strong>P&L data quality:</strong> Partial — broker cost basis or unrealized P&L is unavailable for ' + str(state.unknown_position_pnl_count) + ' position(s).</p>' if not state.pnl_data_complete else ''}
         
         <h2>📝 Executed Today</h2>
         {executed_table if executed_trades else '<p><em>No trades executed today.</em></p>'}
@@ -210,6 +220,12 @@ def _build_positions_table(positions: list) -> str:
     if not positions:
         return ""
 
+    def _fmt_optional_currency(value) -> str:
+        return "N/A" if value is None else f"${value:,.2f}"
+
+    def _fmt_optional_pct(value) -> str:
+        return "N/A" if value is None else f"{value:+.2f}%"
+
     rows = [
         f"<tr>"
         f"<th>Symbol</th><th>Type</th><th>Qty</th><th>Avg Cost</th><th>Price</th>"
@@ -220,24 +236,24 @@ def _build_positions_table(positions: list) -> str:
         symbol = pos.get("symbol", "?")
         asset_type = pos.get("asset_type", "?").upper()
         qty = pos.get("qty", 0)
-        avg_cost = pos.get("avg_cost", 0)
-        price = pos.get("price", 0)
-        mkt_value = pos.get("mkt_value", 0)
-        unrealized_pnl = pos.get("unrealized_pnl", 0)
-        pnl_pct = pos.get("pnl_pct", 0)
+        avg_cost = pos.get("avg_cost")
+        price = pos.get("price")
+        mkt_value = pos.get("mkt_value")
+        unrealized_pnl = pos.get("unrealized_pnl")
+        pnl_pct = pos.get("pnl_pct")
 
-        pnl_color = "positive" if unrealized_pnl >= 0 else "negative"
+        pnl_color = "positive" if (unrealized_pnl or 0) >= 0 else "negative"
 
         rows.append(
             f"<tr>"
             f"<td><strong>{symbol}</strong></td>"
             f"<td>{asset_type}</td>"
             f"<td>{qty:,.4f}</td>"
-            f"<td>${avg_cost:,.2f}</td>"
-            f"<td>${price:,.2f}</td>"
-            f"<td>${mkt_value:,.2f}</td>"
-            f"<td class='{pnl_color}'>${unrealized_pnl:+,.2f}</td>"
-            f"<td class='{pnl_color}'>{pnl_pct:+.2f}%</td>"
+            f"<td>{_fmt_optional_currency(avg_cost)}</td>"
+            f"<td>{_fmt_optional_currency(price)}</td>"
+            f"<td>{_fmt_optional_currency(mkt_value)}</td>"
+            f"<td class='{pnl_color}'>{_fmt_optional_currency(unrealized_pnl) if unrealized_pnl is not None else 'N/A'}</td>"
+            f"<td class='{pnl_color}'>{_fmt_optional_pct(pnl_pct)}</td>"
             f"</tr>"
         )
 
