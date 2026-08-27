@@ -1,8 +1,13 @@
 {
   "portfolio_size": 10000,
-  "max_position_pct": 15,
+  "max_position_pct": 10,
   "min_confidence": 0.70,
+  "max_risk_percent": 1,
+  "max_daily_loss_percent": 2,
+  "max_daily_trades": 3,
+  "max_total_exposure_percent": 80,
   "min_buying_power_to_trade": 500,
+  "allow_margin": false,
   "allow_shorts": false,
   "last_watchlist_refresh_week": "",
   "symbols": [

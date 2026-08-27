@@ -49,6 +49,16 @@ class PortfolioState:
     yesterday_equity: Optional[float] = None
     last_updated: str = ""
     trades_today: int = 0
+    trading_day: str = ""
+    traded_symbols_today: List[str] = field(default_factory=list)
+    start_of_day_equity: Optional[float] = None
+    daily_pnl: float = 0.0
+    daily_loss_limit: float = 0.0
+    daily_loss_triggered: bool = False
+    gross_exposure: float = 0.0
+    max_total_exposure: float = 0.0
+    warnings: List[str] = field(default_factory=list)
+    mode: str = "report"
 
     # ── persistence ────────────────────────────────────────────────────────────
 
@@ -76,6 +86,7 @@ def refresh_from_alpaca(
     alpaca_client: "AlpacaClient",
     symbol_type_map: Dict[str, str],
     price_map: Dict[str, float],
+    starting_balance: float = STARTING_BALANCE,
     trades_today: int = 0,
 ) -> PortfolioState:
     """Fetch the live Alpaca paper account and build a PortfolioState."""
@@ -101,7 +112,7 @@ def refresh_from_alpaca(
         cost_basis = avg_entry * qty
         unrealized_pct = (unrealized / cost_basis * 100) if cost_basis else 0.0
 
-        asset_type = symbol_type_map.get(sym, "stock")
+        asset_type = symbol_type_map.get(sym, "crypto" if "/" in sym else "stock")
         positions.append(
             PositionSnapshot(
                 symbol=sym,
@@ -119,10 +130,11 @@ def refresh_from_alpaca(
     # P&L is calculated against the $10k portfolio budget, not the broker's
     # default paper balance (Alpaca starts paper accounts at $100k).
     total_pnl = sum(p.unrealized_pnl for p in positions)
-    total_pnl_pct = (total_pnl / STARTING_BALANCE) * 100
+    total_pnl_pct = (total_pnl / starting_balance * 100) if starting_balance else 0.0
+    gross_exposure = sum(abs(p.market_value) for p in positions)
 
     return PortfolioState(
-        starting_balance=STARTING_BALANCE,
+        starting_balance=starting_balance,
         account_equity=equity,
         cash=account.cash,
         buying_power=account.buying_power,
@@ -131,6 +143,7 @@ def refresh_from_alpaca(
         total_pnl_pct=total_pnl_pct,
         last_updated=datetime.now(timezone.utc).isoformat(),
         trades_today=trades_today,
+        gross_exposure=gross_exposure,
     )
 
 
