@@ -58,6 +58,7 @@ class RiskEvaluationContext:
     market_data_service_available: bool
     daily_loss_triggered: bool
     protective_stop_supported: bool
+    allow_shorts: bool = False
 
 
 @dataclass
@@ -108,6 +109,39 @@ def qty_for_notional(asset_type: str, entry_price: float, notional_value: float)
 
 def notional_value(entry_price: float, qty: float) -> float:
     return max(0.0, entry_price) * max(0.0, qty)
+
+
+def validate_trade_startup_config(config: RiskConfig, paper_trading: bool) -> list[str]:
+    errors: list[str] = []
+
+    if not paper_trading:
+        errors.append("ALPACA_PAPER must remain true. Live trading is not supported.")
+    if config.allow_margin:
+        errors.append("ALLOW_MARGIN must remain false.")
+    if config.allow_shorts:
+        errors.append("ALLOW_SHORTS must remain false.")
+    if config.portfolio_size <= 0:
+        errors.append("PORTFOLIO_SIZE must be greater than 0.")
+    if not (0 < config.max_position_percent <= 100):
+        errors.append("MAX_POSITION_PERCENT must be between 0 and 100.")
+    if not (0 < config.max_total_exposure_percent <= 100):
+        errors.append("MAX_TOTAL_EXPOSURE_PERCENT must be between 0 and 100.")
+    if config.max_position_percent > config.max_total_exposure_percent:
+        errors.append("MAX_POSITION_PERCENT must be less than or equal to MAX_TOTAL_EXPOSURE_PERCENT.")
+    if config.max_daily_trades < 1:
+        errors.append("MAX_DAILY_TRADES must be at least 1.")
+    if config.max_daily_loss_percent <= 0:
+        errors.append("MAX_DAILY_LOSS_PERCENT must be greater than 0.")
+    if config.max_risk_percent <= 0:
+        errors.append("MAX_RISK_PERCENT must be greater than 0.")
+    if not (0 <= config.min_confidence <= 1):
+        errors.append("MIN_CONFIDENCE must be between 0 and 1.")
+
+    return errors
+
+
+def risk_budget_base(portfolio_size: float, account_equity: float) -> float:
+    return min(max(0.0, portfolio_size), max(0.0, account_equity))
 
 
 class RiskManager:
@@ -207,7 +241,7 @@ class RiskManager:
         if held_qty <= 0.0:
             reasons.append("Rejected: no long position exists to sell.")
 
-        if not self.config.allow_shorts and requested_qty > held_qty > 0.0:
+        if not context.allow_shorts and requested_qty > held_qty > 0.0:
             adjusted_qty = normalize_qty_for_asset(context.asset_type, held_qty)
             notes.append(
                 f"Resized SELL quantity from {requested_qty:g} to {adjusted_qty:g} so the trade cannot open or increase a short position."
@@ -250,7 +284,7 @@ class RiskManager:
         elif stop_price >= context.entry_price:
             reasons.append("Rejected: BUY stop loss must be below the entry price.")
 
-        if not self.config.allow_shorts and context.current_position_qty < 0.0:
+        if not context.allow_shorts and context.current_position_qty < 0.0:
             reasons.append("Rejected: BUY against an existing short position is not supported while shorts are disabled.")
 
         if reasons:
@@ -265,7 +299,8 @@ class RiskManager:
         actual_available_cash = max(0.0, context.actual_available_cash)
 
         per_unit_risk = max(0.0, context.entry_price - stop_price)
-        allowed_risk = max(0.0, context.account_equity * (self.config.max_risk_percent / 100.0))
+        risk_base = risk_budget_base(self.config.portfolio_size, context.account_equity)
+        allowed_risk = max(0.0, risk_base * (self.config.max_risk_percent / 100.0))
         risk_qty_limit = normalize_qty_for_asset(
             context.asset_type,
             allowed_risk / per_unit_risk if per_unit_risk > 0.0 else 0.0,

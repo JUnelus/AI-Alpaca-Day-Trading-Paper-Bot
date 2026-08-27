@@ -1,4 +1,4 @@
-from src.risk_manager import RiskConfig, RiskEvaluationContext, RiskManager
+from src.risk_manager import RiskConfig, RiskEvaluationContext, RiskManager, validate_trade_startup_config
 
 
 def _config() -> RiskConfig:
@@ -197,4 +197,52 @@ def test_margin_cannot_exceed_remaining_portfolio_capacity():
     )
     assert result.approved
     assert result.adjusted_qty == 1.0
+
+
+def test_risk_uses_configured_portfolio_size_when_account_equity_is_larger():
+    manager = RiskManager(config=_config())
+    result = manager.evaluate(
+        _decision(qty=30.0, stop_loss=5.0),
+        _context(account_equity=108_000.0, entry_price=10.0),
+    )
+    assert result.approved
+    assert result.adjusted_qty == 20.0
+
+
+def test_risk_uses_lower_account_equity_when_equity_falls_below_portfolio_size():
+    manager = RiskManager(config=_config())
+    result = manager.evaluate(
+        _decision(qty=30.0, stop_loss=5.0),
+        _context(account_equity=8_000.0, entry_price=10.0),
+    )
+    assert result.approved
+    assert result.adjusted_qty == 16.0
+
+
+def test_validate_trade_startup_config_rejects_unsafe_settings():
+    config = RiskConfig(
+        portfolio_size=0,
+        max_position_percent=120,
+        max_daily_loss_percent=0,
+        max_daily_trades=0,
+        max_total_exposure_percent=5,
+        allow_margin=True,
+        allow_shorts=True,
+        min_confidence=1.5,
+        max_risk_percent=0,
+    )
+
+    errors = validate_trade_startup_config(config, paper_trading=False)
+
+    assert any("ALPACA_PAPER" in error for error in errors)
+    assert any("ALLOW_MARGIN" in error for error in errors)
+    assert any("ALLOW_SHORTS" in error for error in errors)
+    assert any("PORTFOLIO_SIZE" in error for error in errors)
+    assert any("MAX_POSITION_PERCENT" in error for error in errors)
+    assert any("MAX_TOTAL_EXPOSURE_PERCENT" in error for error in errors)
+    assert any("MAX_DAILY_TRADES" in error for error in errors)
+    assert any("MAX_DAILY_LOSS_PERCENT" in error for error in errors)
+    assert any("MAX_RISK_PERCENT" in error for error in errors)
+    assert any("MIN_CONFIDENCE" in error for error in errors)
+
 

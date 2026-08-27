@@ -2,17 +2,19 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from src.alpaca_client import AccountSnapshot
 from src.execution_models import ExecutionResult
-from src.main import apply_execution_to_available_cash, run_once
+from src.main import ConfigurationError, apply_execution_to_available_cash, run_once
 from src.market_data import MarketDataResult
 from src.portfolio import PortfolioState
 from src.strategy import MarketSnapshot, StrategySignal
 
 
 class DummyAlpacaClient:
-    def __init__(self, execution_results=None, positions=None, account=None, fail_on_place=False):
-        self.paper = True
+    def __init__(self, execution_results=None, positions=None, account=None, fail_on_place=False, paper=True):
+        self.paper = paper
         self._execution_results = list(execution_results or [])
         self._positions = list(positions or [])
         self._account = account or AccountSnapshot(equity=10_000.0, cash=5_000.0, buying_power=5_000.0)
@@ -159,6 +161,7 @@ def test_trade_mode_can_reach_order_execution_layer(monkeypatch, tmp_path):
     assert result["mode"] == "trade"
     assert len(alpaca.calls) == 1
     assert result["results"][0]["order_result"]["counts_as_trade"]
+    assert result["email_sent"]
 
 
 def test_report_mode_cannot_place_orders_and_still_updates_reporting(monkeypatch, tmp_path):
@@ -367,6 +370,197 @@ def test_first_three_qualifying_trades_execute_and_fourth_is_rejected(monkeypatc
     fourth_result = next(item for item in result["results"] if item["symbol"] == "AMZN")
     assert not fourth_result["risk"]["approved"]
     assert any("daily trade limit" in reason.lower() for reason in fourth_result["risk"]["reasons"])
+
+
+def test_successful_trade_and_failed_email_still_persists_state(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    alpaca = DummyAlpacaClient()
+
+    monkeypatch.setenv("EMAIL_REQUIRED", "false")
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    result = run_once(
+        mode="trade",
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc),
+        alpaca_client=alpaca,
+    )
+
+    saved_state = PortfolioState.load(str(state_path))
+    assert not result["email_sent"]
+    assert saved_state.trades_today == 1
+    assert summary_path.exists()
+    assert readme_path.exists()
+    assert log_path.exists()
+    assert any("email delivery failed" in warning.lower() for warning in saved_state.warnings)
+
+
+def test_email_required_failure_raises_after_state_is_persisted(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    alpaca = DummyAlpacaClient()
+
+    monkeypatch.setenv("EMAIL_REQUIRED", "true")
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="Execution state was persisted"):
+        run_once(
+            mode="trade",
+            watchlist_path=str(watchlist_path),
+            log_path=str(log_path),
+            summary_path=str(summary_path),
+            readme_path=str(readme_path),
+            state_path=str(state_path),
+            now=datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc),
+            alpaca_client=alpaca,
+        )
+
+    saved_state = PortfolioState.load(str(state_path))
+    assert saved_state.trades_today == 1
+    assert log_path.exists()
+    assert summary_path.exists()
+    assert readme_path.exists()
+    assert any("email delivery failed" in warning.lower() for warning in saved_state.warnings)
+
+
+def test_rerun_after_email_failure_reads_trade_log_and_blocks_duplicate_symbol(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    monkeypatch.setenv("EMAIL_REQUIRED", "true")
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: False)
+    with pytest.raises(RuntimeError):
+        run_once(
+            mode="trade",
+            watchlist_path=str(watchlist_path),
+            log_path=str(log_path),
+            summary_path=str(summary_path),
+            readme_path=str(readme_path),
+            state_path=str(state_path),
+            now=datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc),
+            alpaca_client=DummyAlpacaClient(),
+        )
+
+    second_client = DummyAlpacaClient()
+    monkeypatch.setenv("EMAIL_REQUIRED", "false")
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    result = run_once(
+        mode="trade",
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 14, 5, tzinfo=timezone.utc),
+        alpaca_client=second_client,
+    )
+
+    assert second_client.calls == []
+    assert result["portfolio"]["trades_today"] == 1
+    assert any("per symbol per day" in reason.lower() for reason in result["results"][0]["risk"]["reasons"])
+
+
+def test_scheduled_trade_guard_skips_wrong_dst_candidate_but_manual_trade_can_still_run(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    guarded_client = DummyAlpacaClient()
+    skipped = run_once(
+        mode="trade",
+        enforce_schedule=True,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 14, 45, tzinfo=timezone.utc),
+        alpaca_client=guarded_client,
+    )
+    assert skipped["scheduled_guard_skipped"]
+    assert guarded_client.calls == []
+
+    manual_client = DummyAlpacaClient()
+    executed = run_once(
+        mode="trade",
+        enforce_schedule=False,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 14, 45, tzinfo=timezone.utc),
+        alpaca_client=manual_client,
+    )
+    assert not executed.get("scheduled_guard_skipped", False)
+    assert len(manual_client.calls) == 1
+
+
+def test_invalid_trade_startup_configuration_raises_before_order_placement(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    config = json.loads(watchlist_path.read_text(encoding="utf-8"))
+    config["allow_margin"] = True
+    watchlist_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    client = DummyAlpacaClient()
+
+    with pytest.raises(ConfigurationError, match="ALLOW_MARGIN"):
+        run_once(
+            mode="trade",
+            watchlist_path=str(watchlist_path),
+            log_path=str(log_path),
+            summary_path=str(summary_path),
+            readme_path=str(readme_path),
+            state_path=str(state_path),
+            now=datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc),
+            alpaca_client=client,
+        )
+
+    assert client.calls == []
 
 
 

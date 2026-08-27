@@ -18,9 +18,21 @@ from .execution_models import ExecutionResult
 from .logger import load_trade_activity, log_ai_decision, write_daily_summary
 from .market_data import MarketDataResult, get_market_snapshots
 from .portfolio import PortfolioState, STATE_FILE, refresh_from_alpaca
-from .risk_manager import RiskConfig, RiskEvaluationContext, RiskManager, normalize_qty_for_asset
+from .risk_manager import (
+    RiskConfig,
+    RiskEvaluationContext,
+    RiskManager,
+    normalize_qty_for_asset,
+    validate_trade_startup_config,
+)
 from .strategy import MarketSnapshot, generate_signal, predict_next_day
-from .time_utils import ensure_aware, iso_to_trading_day, trading_day
+from .time_utils import (
+    ensure_aware,
+    iso_to_trading_day,
+    scheduled_mode_matches,
+    scheduled_skip_reason,
+    trading_day,
+)
 from .watchlist_manager import refresh_weekly_watchlist
 
 # ── paths ──────────────────────────────────────────────────────────────────────
@@ -213,11 +225,94 @@ def _build_safety_warnings(
     return deduped
 
 
+class ConfigurationError(RuntimeError):
+    pass
+
+
+def _build_summary_lines(state: PortfolioState, results: list[dict], trading_day_value: str, mode: str) -> list[str]:
+    lines = [
+        f"# Daily Summary — {date.fromisoformat(trading_day_value).isoformat()}",
+        "",
+        f"- Run mode: `{mode}`",
+        "## 💰 Portfolio",
+        f"- Equity: ${state.account_equity:,.2f}",
+        f"- Cash:   ${state.cash:,.2f}",
+        f"- Buying power: ${state.buying_power:,.2f}",
+        f"- P&L:    ${state.total_pnl:+,.2f} ({state.total_pnl_pct:+.2f}%)",
+        f"- Trades executed today: {state.trades_today}",
+        "",
+        "## ⚠️ Safety Status",
+    ]
+    if state.warnings:
+        lines.extend(f"- {warning}" for warning in state.warnings)
+    else:
+        lines.append("- No active safety warnings.")
+
+    lines += [
+        "",
+        "## 🤖 AI Decisions",
+    ]
+    for result in results:
+        order_result = result.get("order_result") or {}
+        if order_result.get("protection_failed"):
+            status = "⚠️ PROTECTION FAILED"
+            reason = order_result.get("message", "Protective stop placement failed.")
+        elif order_result.get("counts_as_trade"):
+            status = "✅ EXECUTED"
+            reason = order_result.get("message", "Broker accepted the order.")
+        elif result["risk"]["approved"]:
+            status = "⏭️ NOT EXECUTED"
+            reason = order_result.get("message", "Order was approved but not sent to the broker.")
+        else:
+            status = "❌ REJECTED"
+            reason = "; ".join(result["risk"]["reasons"])
+        lines.append(
+            f"- **{result['symbol']}** — {result['decision'].get('action', '?').upper()} "
+            f"(conf={result['decision'].get('confidence', 0):.2f}) → {status}: {reason}"
+        )
+
+    return lines
+
+
+def _persist_run_outputs(
+    state: PortfolioState,
+    symbols: list[dict],
+    signal_map: Dict[str, dict],
+    results: list[dict],
+    trading_day_value: str,
+    mode: str,
+    state_path: str,
+    summary_path: str,
+    readme_path: str,
+) -> None:
+    state.save(state_path)
+    dashboard_md = generate_dashboard(state, symbols, signal_map, results)
+    update_readme(dashboard_md, readme_path=readme_path)
+    write_daily_summary(summary_path, _build_summary_lines(state, results, trading_day_value, mode))
+
+
+def _build_noop_result(mode: str, reason: str, previous_state: PortfolioState) -> dict:
+    return {
+        "mode": mode,
+        "scheduled_guard_skipped": True,
+        "reason": reason,
+        "results": [],
+        "portfolio": asdict(previous_state),
+        "market_data": {
+            "service_available": False,
+            "used_fallback_data": False,
+            "message": reason,
+        },
+        "email_sent": False,
+    }
+
+
 # ── main ───────────────────────────────────────────────────────────────────────
 
 def run_once(
     mode: str = "report",
     allow_fallback_data: bool = False,
+    enforce_schedule: bool = False,
     watchlist_path: str = WATCHLIST_PATH,
     log_path: str = LOG_PATH,
     summary_path: str = SUMMARY_PATH,
@@ -233,6 +328,10 @@ def run_once(
     run_time = ensure_aware(now or datetime.now(timezone.utc))
     trading_day_value = trading_day(run_time)
     email_required = str(os.getenv("EMAIL_REQUIRED", "false")).lower() in {"1", "true", "yes"}
+    previous_state = PortfolioState.load(state_path)
+
+    if enforce_schedule and not scheduled_mode_matches(mode, now=run_time):
+        return _build_noop_result(mode, scheduled_skip_reason(mode, now=run_time), previous_state)
 
     # Refresh once per ISO week so the active 10-symbol basket stays market-value ranked.
     refresh_weekly_watchlist(watchlist_path, limit=10)
@@ -241,9 +340,11 @@ def run_once(
     symbols: list[dict] = config["symbols"]
     risk_config = RiskConfig.from_sources(config)
 
-    previous_state = PortfolioState.load(state_path)
-
     alpaca = alpaca_client or AlpacaClient()
+    startup_errors = validate_trade_startup_config(risk_config, alpaca.paper)
+    if mode == "trade" and startup_errors:
+        raise ConfigurationError("Unsafe trade configuration: " + " ; ".join(startup_errors))
+
     account = alpaca.get_account_snapshot()
     held_qty_map, position_value_map, current_gross_exposure = _extract_position_state(alpaca)
     trades_today_count, traded_today = load_trade_activity(log_path, trading_day_value)
@@ -302,6 +403,7 @@ def run_once(
             market_data_service_available=market_data_result.service_available,
             daily_loss_triggered=daily_loss_triggered,
             protective_stop_supported=alpaca.can_place_protected_buy(asset_type),
+            allow_shorts=risk_config.allow_shorts,
         )
         risk = risk_manager.evaluate(decision=decision, context=risk_context)
 
@@ -317,6 +419,7 @@ def run_once(
                 asset_type=asset_type,
                 mode=mode,
                 stop_loss=decision.get("stop_loss"),
+                current_position_qty=held_qty_map.get(sym, 0.0),
             )
             if order_result.counts_as_trade:
                 trades_today_count += 1
@@ -415,54 +518,17 @@ def run_once(
         daily_loss_limit,
     )
 
-    state.save(state_path)
-
-    # ── update README dashboard ────────────────────────────────────────────────
-    dashboard_md = generate_dashboard(state, symbols, signal_map, results)
-    update_readme(dashboard_md, readme_path=readme_path)
-
-    # ── daily summary report ───────────────────────────────────────────────────
-    lines = [
-        f"# Daily Summary — {date.fromisoformat(trading_day_value).isoformat()}",
-        "",
-        f"- Run mode: `{mode}`",
-        "## 💰 Portfolio",
-        f"- Equity: ${state.account_equity:,.2f}",
-        f"- Cash:   ${state.cash:,.2f}",
-        f"- Buying power: ${state.buying_power:,.2f}",
-        f"- P&L:    ${state.total_pnl:+,.2f} ({state.total_pnl_pct:+.2f}%)",
-        f"- Trades executed today: {trades_today_count}",
-        "",
-        "## ⚠️ Safety Status",
-    ]
-    if state.warnings:
-        lines.extend(f"- {warning}" for warning in state.warnings)
-    else:
-        lines.append("- No active safety warnings.")
-
-    lines += [
-        "",
-        "## 🤖 AI Decisions",
-    ]
-    for r in results:
-        order_result = r.get("order_result") or {}
-        if order_result.get("protection_failed"):
-            status = "⚠️ PROTECTION FAILED"
-            reason = order_result.get("message", "Protective stop placement failed.")
-        elif order_result.get("counts_as_trade"):
-            status = "✅ EXECUTED"
-            reason = order_result.get("message", "Broker accepted the order.")
-        elif r["risk"]["approved"]:
-            status = "⏭️ NOT EXECUTED"
-            reason = order_result.get("message", "Order was approved but not sent to the broker.")
-        else:
-            status = "❌ REJECTED"
-            reason = "; ".join(r["risk"]["reasons"])
-        lines.append(
-            f"- **{r['symbol']}** — {r['decision'].get('action', '?').upper()} "
-            f"(conf={r['decision'].get('confidence', 0):.2f}) → {status}: {reason}"
-        )
-    write_daily_summary(summary_path, lines)
+    _persist_run_outputs(
+        state=state,
+        symbols=symbols,
+        signal_map=signal_map,
+        results=results,
+        trading_day_value=trading_day_value,
+        mode=mode,
+        state_path=state_path,
+        summary_path=summary_path,
+        readme_path=readme_path,
+    )
 
     # ── send daily report via email ────────────────────────────────────────────────
     executed_trades = [
@@ -505,9 +571,35 @@ def run_once(
         for sym_cfg in symbols
     ]
     
-    email_sent = send_daily_report(state, executed_trades, open_positions, predictions_data)
+    email_sent = False
+    email_failure_message: Optional[str] = None
+    try:
+        email_sent = send_daily_report(state, executed_trades, open_positions, predictions_data)
+    except Exception as exc:
+        email_failure_message = f"Email delivery failed: {exc}"
+
+    if not email_sent:
+        email_failure_message = email_failure_message or "Email delivery failed: send_daily_report returned False."
+        print(email_failure_message)
+        if email_failure_message not in state.warnings:
+            state.warnings.append(email_failure_message)
+        _persist_run_outputs(
+            state=state,
+            symbols=symbols,
+            signal_map=signal_map,
+            results=results,
+            trading_day_value=trading_day_value,
+            mode=mode,
+            state_path=state_path,
+            summary_path=summary_path,
+            readme_path=readme_path,
+        )
+
     if email_required and not email_sent:
-        raise RuntimeError("EMAIL_REQUIRED=true but daily report email was not sent.")
+        raise RuntimeError(
+            "EMAIL_REQUIRED=true but daily report email was not sent. "
+            "Execution state was persisted before notification failure."
+        )
 
     return {
         "mode": mode,
@@ -518,6 +610,7 @@ def run_once(
             "used_fallback_data": market_data_result.used_fallback_data,
             "message": market_data_result.message,
         },
+        "email_sent": email_sent,
     }
 
 
@@ -534,10 +627,19 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Allow non-tradeable fallback market data for explicit local reporting/simulation only.",
     )
+    parser.add_argument(
+        "--enforce-schedule",
+        action="store_true",
+        help="For scheduled automation only: run only when the current America/New_York time matches the intended mode window.",
+    )
     return parser.parse_args(argv)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    result = run_once(mode=args.mode, allow_fallback_data=args.allow_fallback_data)
+    result = run_once(
+        mode=args.mode,
+        allow_fallback_data=args.allow_fallback_data,
+        enforce_schedule=args.enforce_schedule,
+    )
     print(json.dumps(result, indent=2, default=str))
