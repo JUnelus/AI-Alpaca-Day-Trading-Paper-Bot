@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -13,20 +14,31 @@ from src.strategy import MarketSnapshot, StrategySignal
 
 
 class DummyAlpacaClient:
-    def __init__(self, execution_results=None, positions=None, account=None, fail_on_place=False, paper=True):
+    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True):
         self.paper = paper
         self._execution_results = list(execution_results or [])
         self._positions = list(positions or [])
         self._account = account or AccountSnapshot(equity=10_000.0, cash=5_000.0, buying_power=5_000.0)
+        self._account_snapshots = list(account_snapshots or [])
         self.fail_on_place = fail_on_place
         self.calls = []
         self.is_ready = True
 
     def get_account_snapshot(self):
+        if self._account_snapshots:
+            if len(self._account_snapshots) == 1:
+                return self._account_snapshots[0]
+            return self._account_snapshots.pop(0)
         return self._account
 
     def list_positions(self):
         return list(self._positions)
+
+    def get_position_qty(self, symbol: str):
+        for position in self._positions:
+            if getattr(position, "symbol", "") == symbol:
+                return float(getattr(position, "qty", 0.0))
+        return 0.0
 
     def can_place_protected_buy(self, asset_type: str) -> bool:
         return asset_type in {"stock", "etf"}
@@ -493,7 +505,7 @@ def test_rerun_after_email_failure_reads_trade_log_and_blocks_duplicate_symbol(m
     assert any("per symbol per day" in reason.lower() for reason in result["results"][0]["risk"]["reasons"])
 
 
-def test_scheduled_trade_guard_skips_wrong_dst_candidate_but_manual_trade_can_still_run(monkeypatch, tmp_path):
+def test_scheduled_trade_runs_once_per_eastern_day_but_manual_trade_is_still_allowed(monkeypatch, tmp_path):
     symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
     watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
     monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
@@ -507,35 +519,297 @@ def test_scheduled_trade_guard_skips_wrong_dst_candidate_but_manual_trade_can_st
         ),
     )
 
-    guarded_client = DummyAlpacaClient()
+    first_client = DummyAlpacaClient()
+    first = run_once(
+        mode="trade",
+        scheduled_run=True,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 13, 45, tzinfo=timezone.utc),
+        alpaca_client=first_client,
+    )
+    assert not first.get("scheduled_marker_skipped", False)
+    assert len(first_client.calls) == 1
+    assert PortfolioState.load(str(state_path)).last_scheduled_trade_day == "2026-08-27"
+
+    second_client = DummyAlpacaClient()
     skipped = run_once(
         mode="trade",
-        enforce_schedule=True,
+        scheduled_run=True,
         watchlist_path=str(watchlist_path),
         log_path=str(log_path),
         summary_path=str(summary_path),
         readme_path=str(readme_path),
         state_path=str(state_path),
-        now=datetime(2026, 8, 27, 14, 45, tzinfo=timezone.utc),
-        alpaca_client=guarded_client,
+        now=datetime(2026, 8, 27, 13, 50, tzinfo=timezone.utc),
+        alpaca_client=second_client,
     )
-    assert skipped["scheduled_guard_skipped"]
-    assert guarded_client.calls == []
+    assert skipped["scheduled_marker_skipped"]
+    assert second_client.calls == []
 
+    manual_state_path = tmp_path / "manual_state.json"
+    PortfolioState(last_scheduled_trade_day="2026-08-27").save(str(manual_state_path))
     manual_client = DummyAlpacaClient()
-    executed = run_once(
+    manual = run_once(
         mode="trade",
-        enforce_schedule=False,
+        scheduled_run=False,
         watchlist_path=str(watchlist_path),
-        log_path=str(log_path),
+        log_path=str(tmp_path / "manual_trade_log.csv"),
         summary_path=str(summary_path),
         readme_path=str(readme_path),
-        state_path=str(state_path),
-        now=datetime(2026, 8, 27, 14, 45, tzinfo=timezone.utc),
+        state_path=str(manual_state_path),
+        now=datetime(2026, 8, 27, 13, 55, tzinfo=timezone.utc),
         alpaca_client=manual_client,
     )
-    assert not executed.get("scheduled_guard_skipped", False)
+    assert not manual.get("scheduled_marker_skipped", False)
     assert len(manual_client.calls) == 1
+
+
+def test_scheduled_trade_runs_again_on_next_eastern_day(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    previous_state = PortfolioState(last_scheduled_trade_day="2026-08-27", trading_day="2026-08-27")
+    previous_state.save(str(state_path))
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    client = DummyAlpacaClient()
+    result = run_once(
+        mode="trade",
+        scheduled_run=True,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 28, 13, 45, tzinfo=timezone.utc),
+        alpaca_client=client,
+    )
+
+    assert not result.get("scheduled_marker_skipped", False)
+    assert len(client.calls) == 1
+    assert PortfolioState.load(str(state_path)).last_scheduled_trade_day == "2026-08-28"
+
+
+def test_scheduled_report_runs_once_per_eastern_day(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    first = run_once(
+        mode="report",
+        scheduled_run=True,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 20, 15, tzinfo=timezone.utc),
+        alpaca_client=DummyAlpacaClient(),
+    )
+    assert not first.get("scheduled_marker_skipped", False)
+    assert PortfolioState.load(str(state_path)).last_scheduled_report_day == "2026-08-27"
+
+    second = run_once(
+        mode="report",
+        scheduled_run=True,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 20, 20, tzinfo=timezone.utc),
+        alpaca_client=DummyAlpacaClient(),
+    )
+    assert second["scheduled_marker_skipped"]
+
+
+def test_daily_pnl_uses_final_authoritative_equity(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    alpaca = DummyAlpacaClient(
+        account_snapshots=[
+            AccountSnapshot(equity=10_000.0, cash=5_000.0, buying_power=5_000.0),
+            AccountSnapshot(equity=9_850.0, cash=4_850.0, buying_power=4_850.0),
+        ],
+        positions=[SimpleNamespace(symbol="AAPL", qty="1", avg_entry_price="100", current_price="100", market_value="100", cost_basis="100", unrealized_pl="0", unrealized_plpc="0")],
+    )
+
+    result = run_once(
+        mode="report",
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 20, 15, tzinfo=timezone.utc),
+        alpaca_client=alpaca,
+    )
+
+    assert result["portfolio"]["start_of_day_equity"] == 10_000.0
+    assert result["portfolio"]["account_equity"] == 9_850.0
+    assert result["portfolio"]["daily_pnl"] == -150.0
+    assert not result["portfolio"]["daily_loss_triggered"]
+
+
+def test_daily_loss_circuit_breaker_uses_final_equity_value(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    alpaca = DummyAlpacaClient(
+        account_snapshots=[
+            AccountSnapshot(equity=10_000.0, cash=5_000.0, buying_power=5_000.0),
+            AccountSnapshot(equity=9_800.0, cash=4_800.0, buying_power=4_800.0),
+        ],
+    )
+
+    result = run_once(
+        mode="report",
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 27, 20, 15, tzinfo=timezone.utc),
+        alpaca_client=alpaca,
+    )
+
+    assert result["portfolio"]["daily_pnl"] == -200.0
+    assert result["portfolio"]["daily_loss_triggered"]
+
+
+def test_same_eastern_day_report_does_not_reset_start_of_day_equity(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    previous_state = PortfolioState(
+        trading_day="2026-08-27",
+        start_of_day_equity=10_000.0,
+        account_equity=9_900.0,
+        daily_pnl=-100.0,
+        daily_loss_limit=200.0,
+    )
+    previous_state.save(str(state_path))
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    alpaca = DummyAlpacaClient(
+        account_snapshots=[
+            AccountSnapshot(equity=9_950.0, cash=4_950.0, buying_power=4_950.0),
+            AccountSnapshot(equity=9_900.0, cash=4_900.0, buying_power=4_900.0),
+        ]
+    )
+    result = run_once(
+        mode="report",
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 28, 0, 30, tzinfo=timezone.utc),
+        alpaca_client=alpaca,
+    )
+
+    assert result["portfolio"]["trading_day"] == "2026-08-27"
+    assert result["portfolio"]["start_of_day_equity"] == 10_000.0
+    assert result["portfolio"]["daily_pnl"] == -100.0
+
+
+def test_new_eastern_day_resets_start_of_day_equity(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    previous_state = PortfolioState(
+        trading_day="2026-08-27",
+        start_of_day_equity=10_000.0,
+        account_equity=9_900.0,
+        daily_pnl=-100.0,
+        daily_loss_limit=200.0,
+    )
+    previous_state.save(str(state_path))
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(
+            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            service_available=True,
+            used_fallback_data=False,
+        ),
+    )
+
+    alpaca = DummyAlpacaClient(
+        account_snapshots=[
+            AccountSnapshot(equity=9_920.0, cash=4_920.0, buying_power=4_920.0),
+            AccountSnapshot(equity=9_910.0, cash=4_910.0, buying_power=4_910.0),
+        ]
+    )
+    result = run_once(
+        mode="report",
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=datetime(2026, 8, 28, 5, 0, tzinfo=timezone.utc),
+        alpaca_client=alpaca,
+    )
+
+    assert result["portfolio"]["trading_day"] == "2026-08-28"
+    assert result["portfolio"]["start_of_day_equity"] == 9_920.0
+    assert result["portfolio"]["daily_pnl"] == -10.0
 
 
 def test_invalid_trade_startup_configuration_raises_before_order_placement(monkeypatch, tmp_path):

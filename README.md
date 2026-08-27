@@ -85,9 +85,10 @@ ai-alpaca-day-trading-paper-bot/
 | Daily loss circuit breaker | `MAX_DAILY_LOSS_PERCENT=2` blocks new BUYs after the threshold is hit |
 | Margin | `ALLOW_MARGIN=false` |
 | Shorts | `ALLOW_SHORTS=false` |
-| Protective stop policy | New long stock/ETF BUYs must have broker-side stop protection or the entry is rejected |
+| Protective stop policy | New long stock/ETF BUYs must have broker-side `GTC` broker-side stop protection or the entry is rejected |
 | Crypto BUY safety | Rejected whenever reliable broker-side protective stops cannot be guaranteed |
 | Market-data safety | Fallback/demo prices are **never** eligible for paper-order execution |
+| Scheduled automation idempotency | Scheduled trade/report runs persist once-per-Eastern-trading-day markers |
 | Logging | Every decision is logged, including execution status, protection state, order IDs, and rejection reasons |
 
 ### Default Safety Configuration
@@ -109,6 +110,7 @@ MAX_RISK_PERCENT=1
 ### Protective Stop Behavior
 
 - For new long **stock/ETF BUY** orders, the bot submits broker-side protection through Alpaca-supported attached stop logic using **`GTC`** protection so the stop can persist beyond the current session.
+- Attached OTO protection is only treated as active after bounded polling confirms an actual stop child with a valid child order ID, stop price, side, and quantity.
 - If the bot cannot reliably create that protective stop, it **rejects the BUY** instead of placing an unprotected entry.
 - If an entry is accepted/executed but protection confirmation fails, the run records a **critical protection failure** and does not treat the trade as safely protected.
 - Normal long **SELL-to-close** orders do not create a new entry-style stop.
@@ -117,8 +119,10 @@ MAX_RISK_PERCENT=1
 
 - Before a long **SELL-to-close**, the bot discovers any active broker-side protective stop(s) for that symbol.
 - For a **full exit**, it cancels and verifies the protective stop(s) before submitting the close order.
-- For a **partial exit**, it cancels the prior protection, executes the SELL, then replaces protection for the remaining long quantity using the existing stop price when that can be determined safely.
-- If the bot cannot safely identify, cancel, verify, or replace protection, it fails closed and returns a structured warning/failure instead of risking a stale stop that could create an unintended short.
+- If the close SELL fails after cancellation, the bot attempts to **restore the original protective stop** for the verified remaining broker position.
+- For a **partial exit**, it cancels the prior protection, executes the SELL, then replaces protection for the **verified broker-side remaining long quantity** using the existing stop price when that can be determined safely.
+- Cancellation verification and attached-stop confirmation both use **bounded broker-state polling** so normal asynchronous broker updates such as `pending_cancel` do not cause unsafe duplicate actions.
+- If the bot cannot safely identify, cancel, verify, or replace protection, it fails to close and returns a structured warning/failure instead of risking a stale stop that could create an unintended short.
 
 ### Risk Base
 
@@ -131,6 +135,17 @@ min(PORTFOLIO_SIZE, current account equity)
 - Example: if `PORTFOLIO_SIZE=10000` and Alpaca paper equity is `$108,000`, a `1%` max-risk policy still limits allowed trade risk to `$100`.
 - If live paper equity falls below the configured budget, the bot becomes even more conservative and uses the lower equity value instead.
 
+### Daily P&L Consistency
+
+- The persisted daily P&L invariant is:
+
+```text
+daily_pnl = final account equity - start_of_day_equity
+```
+
+- `start_of_day_equity` is established on the first valid run of a new `America/New_York` trading day and preserved on later runs that same Eastern day.
+- The dashboard, JSON state, summary report, and daily-loss circuit breaker all use that same authoritative final equity relationship.
+
 ### Market Data Safety
 
 - `trade` mode requires fresh Alpaca market data.
@@ -142,7 +157,13 @@ min(PORTFOLIO_SIZE, current account equity)
 
 - Broker execution state is persisted before email delivery is treated as complete.
 - If email delivery fails, the bot preserves `data/trade_log.csv`, `data/portfolio_state.json`, `reports/daily_summary.md`, and `README.md` so reruns still see the recorded trade state.
-- If `EMAIL_REQUIRED=true`, the bot may still fail the run **after** state persistence so the notification problem is surfaced without erasing execution history.
+- If `EMAIL_REQUIRED=true`, the bot may still fail the run **after** state persistence, so the notification problem is surfaced without erasing execution history.
+
+### Broker Data Quality
+
+- Broker cost basis and unrealized P&L fields are used directly when Alpaca provides them.
+- If cost basis or unrealized P&L cannot be verified reliably for a position, the bot shows **`N/A`** instead of treating market value as profit.
+- Broker portfolio P&L is marked **partial** whenever one or more positions lack reliable cost-basis/P&L data.
 
 ## ⚙️ GitHub Actions Setup
 
@@ -159,14 +180,16 @@ min(PORTFOLIO_SIZE, current account equity)
      - installs dependencies and runs `python -m pytest -q`
      - **never** places broker orders
    - `.github/workflows/daily_trade.yml`
-      - scheduled morning run: `python -m src.main --mode trade --enforce-schedule`
-      - scheduled afternoon run: `python -m src.main --mode report --enforce-schedule`
+      - scheduled morning run: `python -m src.main --mode trade --scheduled-run`
+      - scheduled afternoon run: `python -m src.main --mode report --scheduled-run`
      - manual runs require an explicit mode choice and default to `report`
      - every bot run forces `ALPACA_PAPER=true`
       - state-mutating bot runs are serialized with GitHub Actions concurrency (`alpaca-paper-trading-bot`)
-      - state commit steps still run after bot-step failures so email issues cannot prevent execution-state commits
+      - state commit steps still run after bot-step failures, so email issues cannot prevent execution-state commits
+      - native GitHub schedule timezone is `America/New_York`
+      - scheduled trade/report runs use persisted once-per-trading-day markers so accidental reruns become no-ops
 
-> GitHub cron uses UTC, so the workflow schedules both EDT and EST candidate UTC times and the bot performs a strict `America/New_York` runtime check. Only the correct local `9:45 AM ET` trade window or `4:15 PM ET` report window is allowed to continue.
+> The scheduled workflow runs at **9:45 AM America/New_York** for trade mode and **4:15 PM America/New_York** for report mode through both EST and EDT using native GitHub timezone scheduling.
 
 ## 🚀 Local Quick Start
 
@@ -178,8 +201,8 @@ Copy-Item .env.example .env          # then fill in your keys
 python -m pytest -q                  # run tests
 python -m src.main --mode report     # safe default: reporting/dashboard only
 python -m src.main --mode trade      # paper-trading run with risk checks and broker orders
-python -m src.main --mode trade --enforce-schedule    # scheduled-trade safety guard
-python -m src.main --mode report --enforce-schedule   # scheduled-report safety guard
+python -m src.main --mode trade --scheduled-run       # scheduled-trade idempotency markers enabled
+python -m src.main --mode report --scheduled-run      # scheduled-report idempotency markers enabled
 python -m src.main --mode report --allow-fallback-data   # explicit local simulation/reporting only
 ```
 

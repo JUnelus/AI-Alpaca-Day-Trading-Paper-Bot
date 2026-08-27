@@ -26,9 +26,21 @@ def _fmt_usd(value: float, sign: bool = False) -> str:
     return f"{prefix}${value:,.2f}"
 
 
+def _fmt_optional_usd(value: Optional[float], sign: bool = False) -> str:
+    if value is None:
+        return "N/A"
+    return _fmt_usd(value, sign=sign)
+
+
 def _fmt_pct(value: float) -> str:
     prefix = "+" if value > 0 else ""
     return f"{prefix}{value:.2f}%"
+
+
+def _fmt_optional_pct(value: Optional[float]) -> str:
+    if value is None:
+        return "N/A"
+    return _fmt_pct(value)
 
 
 def _qty_str(qty: float) -> str:
@@ -46,6 +58,8 @@ def generate_dashboard(
     """Return the markdown content that sits between the two marker comments."""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     pnl_icon = _icon(state.total_pnl)
+    legacy_account_state = state.gross_exposure > state.max_total_exposure + 1e-9 if state.max_total_exposure else False
+    broker_pnl_label = "Broker Position P&L (partial)" if not state.pnl_data_complete else "Broker Position P&L"
 
     lines: List[str] = [
         "",
@@ -61,14 +75,30 @@ def generate_dashboard(
         "",
         "| Metric | Value |",
         "|:-------|------:|",
-        f"| 🏦 Starting Balance  | `${state.starting_balance:,.2f}` |",
-        f"| 💵 Current Equity    | `${state.account_equity:,.2f}` |",
-        f"| 💸 Cash Available    | `${state.cash:,.2f}` |",
-        f"| 🧾 Buying Power      | `${state.buying_power:,.2f}` |",
-        f"| {pnl_icon} Total P&L | `{_fmt_usd(state.total_pnl, sign=True)}` "
+        f"| 🧭 Configured Strategy Budget | `${state.starting_balance:,.2f}` |",
+        f"| 🛡️ Strategy Max Gross Exposure | `${state.max_total_exposure:,.2f}` |",
+        f"| 💵 Alpaca Paper Account Equity | `${state.account_equity:,.2f}` |",
+        f"| 💸 Broker Cash Available | `${state.cash:,.2f}` |",
+        f"| 🧾 Broker Buying Power | `${state.buying_power:,.2f}` |",
+        f"| 📦 Actual Broker Gross Exposure | `${state.gross_exposure:,.2f}` |",
+        f"| {pnl_icon} {broker_pnl_label} | `{_fmt_usd(state.total_pnl, sign=True)}` "
         f"&nbsp; `({_fmt_pct(state.total_pnl_pct)})` |",
+        f"| 📆 Daily P&L (final equity - start of day) | `{_fmt_usd(state.daily_pnl, sign=True)}` |",
         "",
     ]
+
+    if legacy_account_state:
+        lines += [
+            "### ⚠️ LEGACY PAPER ACCOUNT STATE",
+            "",
+            "The current Alpaca paper account contains positions created before the present "
+            "`$10,000` risk controls were enforced.",
+            "",
+            "Current broker equity/P&L should not be interpreted as performance of the current hardened strategy.",
+            "",
+            "The bot will warn, block additional BUY exposure, and continue allowing valid risk-reducing SELLs.",
+            "",
+        ]
 
     if state.warnings:
         lines += [
@@ -76,23 +106,24 @@ def generate_dashboard(
             "",
         ]
         lines.extend(f"- {warning}" for warning in state.warnings)
+        if not state.pnl_data_complete:
+            lines.append(
+                f"- Broker position P&L is partial because cost basis or unrealized P&L is unavailable for {state.unknown_position_pnl_count} position(s)."
+            )
         lines.append("")
 
     # ── written summary ─────────────────────────────────────────────────────────
-    day_pnl = None
-    if state.yesterday_total_pnl is not None:
-        day_pnl = state.total_pnl - state.yesterday_total_pnl
-
     lines += [
         "### 📝 Daily Trade Summary",
         "",
-        f"- **Startup-to-date Total P&L:** `{_fmt_usd(state.total_pnl, sign=True)}` ({_fmt_pct(state.total_pnl_pct)})",
+        f"- **Broker position P&L:** `{_fmt_usd(state.total_pnl, sign=True)}` ({_fmt_pct(state.total_pnl_pct)})",
+        f"- **Daily P&L:** `{_fmt_usd(state.daily_pnl, sign=True)}`",
     ]
 
-    if day_pnl is None:
-        lines.append("- **Yesterday-to-today P&L:** _Not available yet (needs at least one prior-day snapshot)._")
-    else:
-        lines.append(f"- **Yesterday-to-today P&L:** `{_fmt_usd(day_pnl, sign=True)}`")
+    if not state.pnl_data_complete:
+        lines.append(
+            f"- **P&L data quality:** Partial — cost basis or unrealized P&L is unavailable for {state.unknown_position_pnl_count} position(s)."
+        )
 
     executed = []
     for result in run_results or []:
@@ -132,16 +163,16 @@ def generate_dashboard(
             "|:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|",
         ]
         for pos in state.positions:
-            icon = _icon(pos.unrealized_pnl)
+            icon = _icon(pos.unrealized_pnl or 0.0)
             position_label = f"{pos.asset_type.upper()} {'📉 SHORT' if pos.qty < 0 else ''}" .strip()
             lines.append(
                 f"| **{pos.symbol}** | {position_label} "
                 f"| {_qty_str(pos.qty)} "
-                f"| ${pos.avg_entry_price:,.2f} "
-                f"| ${pos.current_price:,.2f} "
-                f"| ${pos.market_value:,.2f} "
-                f"| {icon} {_fmt_usd(pos.unrealized_pnl, sign=True)} "
-                f"| {_fmt_pct(pos.unrealized_pnl_pct)} |"
+                f"| {_fmt_optional_usd(pos.avg_entry_price)} "
+                f"| {_fmt_optional_usd(pos.current_price)} "
+                f"| {_fmt_optional_usd(pos.market_value)} "
+                f"| {icon} {_fmt_optional_usd(pos.unrealized_pnl, sign=True)} "
+                f"| {_fmt_optional_pct(pos.unrealized_pnl_pct)} |"
             )
     else:
         lines.append("*No open positions.*")

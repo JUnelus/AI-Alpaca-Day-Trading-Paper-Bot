@@ -2,14 +2,10 @@ name: 🤖 Scheduled Paper Trading Bot
 
 on:
   schedule:
-    # 9:45 AM ET candidate during daylight time (EDT)
-    - cron: '45 13 * * 1-5'
-    # 9:45 AM ET candidate during standard time (EST)
-    - cron: '45 14 * * 1-5'
-    # 4:15 PM ET candidate during daylight time (EDT)
-    - cron: '15 20 * * 1-5'
-    # 4:15 PM ET candidate during standard time (EST)
-    - cron: '15 21 * * 1-5'
+    - cron: '45 9 * * 1-5'
+      timezone: 'America/New_York'
+    - cron: '15 16 * * 1-5'
+      timezone: 'America/New_York'
   workflow_dispatch:
     inputs:
       mode:
@@ -36,7 +32,7 @@ concurrency:
 jobs:
   scheduled-trade:
     name: Scheduled Trade Run
-    if: github.event_name == 'schedule' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5') && github.actor != 'github-actions[bot]'
+    if: github.event_name == 'schedule' && github.event.schedule == '45 9 * * 1-5' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -78,7 +74,7 @@ jobs:
           SMTP_SERVER:       'smtp.gmail.com'
           SMTP_PORT:         '587'
           EMAIL_REQUIRED:    'true'
-        run: python -m src.main --mode trade --enforce-schedule
+        run: python -m src.main --mode trade --scheduled-run
 
       - name: 📊  Commit updated dashboard & portfolio state
         if: always()
@@ -100,7 +96,7 @@ jobs:
 
   scheduled-report:
     name: Scheduled Report Run
-    if: github.event_name == 'schedule' && (github.event.schedule == '15 20 * * 1-5' || github.event.schedule == '15 21 * * 1-5') && github.actor != 'github-actions[bot]'
+    if: github.event_name == 'schedule' && github.event.schedule == '15 16 * * 1-5' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -142,7 +138,7 @@ jobs:
           SMTP_SERVER:       'smtp.gmail.com'
           SMTP_PORT:         '587'
           EMAIL_REQUIRED:    'true'
-        run: python -m src.main --mode report --enforce-schedule
+        run: python -m src.main --mode report --scheduled-run
 
       - name: 📊  Commit updated dashboard & portfolio state
         if: always()

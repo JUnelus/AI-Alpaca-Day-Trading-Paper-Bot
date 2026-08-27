@@ -26,13 +26,7 @@ from .risk_manager import (
     validate_trade_startup_config,
 )
 from .strategy import MarketSnapshot, generate_signal, predict_next_day
-from .time_utils import (
-    ensure_aware,
-    iso_to_trading_day,
-    scheduled_mode_matches,
-    scheduled_skip_reason,
-    trading_day,
-)
+from .time_utils import ensure_aware, iso_to_trading_day, trading_day
 from .watchlist_manager import refresh_weekly_watchlist
 
 # ── paths ──────────────────────────────────────────────────────────────────────
@@ -180,8 +174,6 @@ def _build_safety_warnings(
     risk_config: RiskConfig,
     market_data_result: MarketDataResult,
     mode: str,
-    daily_pnl: float,
-    daily_loss_limit: float,
 ) -> list[str]:
     warnings: list[str] = []
     max_position_value = risk_config.portfolio_size * (risk_config.max_position_percent / 100.0)
@@ -190,6 +182,9 @@ def _build_safety_warnings(
     if state.gross_exposure > max_total_exposure + 1e-9:
         warnings.append(
             f"Current gross exposure ${state.gross_exposure:.2f} exceeds the configured limit of ${max_total_exposure:.2f}. New BUY orders are blocked until exposure is reduced."
+        )
+        warnings.append(
+            "LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $10,000 strategy controls were enforced."
         )
 
     for pos in state.positions:
@@ -210,13 +205,18 @@ def _build_safety_warnings(
     if state.daily_loss_triggered:
         circuit_breaker_message = (
             f"Daily loss circuit breaker triggered: Start-of-day equity: ${state.start_of_day_equity:.2f}; "
-            f"Current equity: ${state.account_equity:.2f}; Daily P&L: ${daily_pnl:.2f}; Limit: -${daily_loss_limit:.2f}."
+            f"Current equity: ${state.account_equity:.2f}; Daily P&L: ${state.daily_pnl:.2f}; Limit: -${state.daily_loss_limit:.2f}."
         )
         warnings.append(circuit_breaker_message)
         print(circuit_breaker_message)
 
     if market_data_result.message:
         warnings.append(market_data_result.message)
+
+    if not state.pnl_data_complete:
+        warnings.append(
+            f"Broker position P&L is partial because cost basis or unrealized P&L is unavailable for {state.unknown_position_pnl_count} position(s)."
+        )
 
     deduped: list[str] = []
     for warning in warnings:
@@ -229,16 +229,39 @@ class ConfigurationError(RuntimeError):
     pass
 
 
+def _scheduled_marker_field(mode: str) -> str:
+    return "last_scheduled_trade_day" if mode == "trade" else "last_scheduled_report_day"
+
+
+def _scheduled_run_already_completed(state: PortfolioState, mode: str, trading_day_value: str) -> bool:
+    return getattr(state, _scheduled_marker_field(mode), "") == trading_day_value
+
+
+def _apply_final_daily_metrics(
+    state: PortfolioState,
+    start_of_day_equity: float,
+    risk_config: RiskConfig,
+) -> None:
+    state.start_of_day_equity = start_of_day_equity
+    state.daily_loss_limit = risk_config.portfolio_size * (risk_config.max_daily_loss_percent / 100.0)
+    state.daily_pnl = state.account_equity - start_of_day_equity
+    state.daily_loss_triggered = state.daily_pnl <= -state.daily_loss_limit
+
+
 def _build_summary_lines(state: PortfolioState, results: list[dict], trading_day_value: str, mode: str) -> list[str]:
     lines = [
         f"# Daily Summary — {date.fromisoformat(trading_day_value).isoformat()}",
         "",
         f"- Run mode: `{mode}`",
         "## 💰 Portfolio",
-        f"- Equity: ${state.account_equity:,.2f}",
-        f"- Cash:   ${state.cash:,.2f}",
-        f"- Buying power: ${state.buying_power:,.2f}",
-        f"- P&L:    ${state.total_pnl:+,.2f} ({state.total_pnl_pct:+.2f}%)",
+        f"- Configured strategy budget: ${state.starting_balance:,.2f}",
+        f"- Strategy max gross exposure: ${state.max_total_exposure:,.2f}",
+        f"- Alpaca paper account equity: ${state.account_equity:,.2f}",
+        f"- Broker cash: ${state.cash:,.2f}",
+        f"- Broker buying power: ${state.buying_power:,.2f}",
+        f"- Actual broker gross exposure: ${state.gross_exposure:,.2f}",
+        f"- Broker position P&L: ${state.total_pnl:+,.2f} ({state.total_pnl_pct:+.2f}%)",
+        f"- Daily P&L (final equity - start of day): ${state.daily_pnl:+,.2f}",
         f"- Trades executed today: {state.trades_today}",
         "",
         "## ⚠️ Safety Status",
@@ -294,7 +317,7 @@ def _persist_run_outputs(
 def _build_noop_result(mode: str, reason: str, previous_state: PortfolioState) -> dict:
     return {
         "mode": mode,
-        "scheduled_guard_skipped": True,
+        "scheduled_marker_skipped": True,
         "reason": reason,
         "results": [],
         "portfolio": asdict(previous_state),
@@ -312,7 +335,7 @@ def _build_noop_result(mode: str, reason: str, previous_state: PortfolioState) -
 def run_once(
     mode: str = "report",
     allow_fallback_data: bool = False,
-    enforce_schedule: bool = False,
+    scheduled_run: bool = False,
     watchlist_path: str = WATCHLIST_PATH,
     log_path: str = LOG_PATH,
     summary_path: str = SUMMARY_PATH,
@@ -330,9 +353,6 @@ def run_once(
     email_required = str(os.getenv("EMAIL_REQUIRED", "false")).lower() in {"1", "true", "yes"}
     previous_state = PortfolioState.load(state_path)
 
-    if enforce_schedule and not scheduled_mode_matches(mode, now=run_time):
-        return _build_noop_result(mode, scheduled_skip_reason(mode, now=run_time), previous_state)
-
     # Refresh once per ISO week so the active 10-symbol basket stays market-value ranked.
     refresh_weekly_watchlist(watchlist_path, limit=10)
 
@@ -344,6 +364,13 @@ def run_once(
     startup_errors = validate_trade_startup_config(risk_config, alpaca.paper)
     if mode == "trade" and startup_errors:
         raise ConfigurationError("Unsafe trade configuration: " + " ; ".join(startup_errors))
+
+    if scheduled_run and _scheduled_run_already_completed(previous_state, mode, trading_day_value):
+        return _build_noop_result(
+            mode,
+            f"Scheduled {mode} run skipped because it already completed for trading day {trading_day_value}.",
+            previous_state,
+        )
 
     account = alpaca.get_account_snapshot()
     held_qty_map, position_value_map, current_gross_exposure = _extract_position_state(alpaca)
@@ -503,19 +530,18 @@ def run_once(
 
     state.trading_day = trading_day_value
     state.traded_symbols_today = sorted(traded_today)
-    state.start_of_day_equity = start_of_day_equity
-    state.daily_pnl = daily_pnl
-    state.daily_loss_limit = daily_loss_limit
-    state.daily_loss_triggered = daily_loss_triggered
     state.max_total_exposure = risk_config.portfolio_size * (risk_config.max_total_exposure_percent / 100.0)
     state.mode = mode
+    state.last_scheduled_trade_day = previous_state.last_scheduled_trade_day
+    state.last_scheduled_report_day = previous_state.last_scheduled_report_day
+    if scheduled_run:
+        setattr(state, _scheduled_marker_field(mode), trading_day_value)
+    _apply_final_daily_metrics(state, start_of_day_equity, risk_config)
     state.warnings = _build_safety_warnings(
         state,
         risk_config,
         market_data_result,
         mode,
-        daily_pnl,
-        daily_loss_limit,
     )
 
     _persist_run_outputs(
@@ -555,7 +581,7 @@ def run_once(
             "price": pos.current_price,
             "mkt_value": pos.market_value,
             "unrealized_pnl": pos.unrealized_pnl,
-            "pnl_pct": pos.unrealized_pnl_pct * 100,
+            "pnl_pct": pos.unrealized_pnl_pct,
         }
         for pos in state.positions
     ]
@@ -628,9 +654,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         help="Allow non-tradeable fallback market data for explicit local reporting/simulation only.",
     )
     parser.add_argument(
-        "--enforce-schedule",
+        "--scheduled-run",
         action="store_true",
-        help="For scheduled automation only: run only when the current America/New_York time matches the intended mode window.",
+        help="Mark this run as scheduled automation so once-per-trading-day execution markers are enforced.",
     )
     return parser.parse_args(argv)
 
@@ -640,6 +666,6 @@ if __name__ == "__main__":
     result = run_once(
         mode=args.mode,
         allow_fallback_data=args.allow_fallback_data,
-        enforce_schedule=args.enforce_schedule,
+        scheduled_run=args.scheduled_run,
     )
     print(json.dumps(result, indent=2, default=str))

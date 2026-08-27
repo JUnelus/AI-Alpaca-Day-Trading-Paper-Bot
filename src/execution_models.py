@@ -24,7 +24,14 @@ class ExecutionResult:
     cancelled_protective_order_ids: list[str] = field(default_factory=list)
     replacement_protective_order_id: str | None = None
     remaining_position_qty: float | None = None
+    actual_remaining_position_qty: float | None = None
     protection_reconciled: bool = False
+    protection_restore_attempted: bool = False
+    protection_restored: bool = False
+    restored_protective_order_id: str | None = None
+    protection_retry_count: int = 0
+    cancel_poll_attempts: int = 0
+    stop_confirmation_poll_attempts: int = 0
 
     def to_dict(self) -> dict:
         return asdict(self)
