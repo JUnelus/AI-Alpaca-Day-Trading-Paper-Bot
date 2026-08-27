@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -21,6 +21,10 @@ class ExecutionResult:
     stop_price: float | None = None
     asset_type: str = "stock"
     order_class: str | None = None
+    cancelled_protective_order_ids: list[str] = field(default_factory=list)
+    replacement_protective_order_id: str | None = None
+    remaining_position_qty: float | None = None
+    protection_reconciled: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)

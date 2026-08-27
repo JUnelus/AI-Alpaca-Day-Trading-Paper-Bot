@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
 TRADING_TIMEZONE = ZoneInfo("America/New_York")
+DEFAULT_SCHEDULE_TOLERANCE_MINUTES = 3
+SCHEDULE_TARGETS = {
+    "trade": time(hour=9, minute=45),
+    "report": time(hour=16, minute=15),
+}
 
 
 def utc_now() -> datetime:
@@ -41,4 +46,39 @@ def iso_to_trading_day(value: str) -> str | None:
     if parsed is None:
         return None
     return parsed.astimezone(TRADING_TIMEZONE).date().isoformat()
+
+
+def scheduled_mode_matches(
+    mode: str,
+    now: datetime | None = None,
+    tolerance_minutes: int = DEFAULT_SCHEDULE_TOLERANCE_MINUTES,
+) -> bool:
+    target = SCHEDULE_TARGETS.get(mode)
+    if target is None:
+        raise ValueError(f"Unsupported scheduled mode: {mode}")
+
+    local_now = trading_datetime(now)
+    target_dt = local_now.replace(
+        hour=target.hour,
+        minute=target.minute,
+        second=0,
+        microsecond=0,
+    )
+    delta_seconds = abs((local_now - target_dt).total_seconds())
+    return delta_seconds <= max(0, tolerance_minutes) * 60
+
+
+def scheduled_skip_reason(
+    mode: str,
+    now: datetime | None = None,
+    tolerance_minutes: int = DEFAULT_SCHEDULE_TOLERANCE_MINUTES,
+) -> str:
+    local_now = trading_datetime(now)
+    target = SCHEDULE_TARGETS[mode]
+    return (
+        f"Scheduled {mode} run skipped: current America/New_York time "
+        f"{local_now.strftime('%Y-%m-%d %H:%M:%S %Z')} is outside the "
+        f"{target.strftime('%H:%M')} ET execution window (±{tolerance_minutes} min)."
+    )
+
 

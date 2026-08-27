@@ -8,9 +8,10 @@ from .execution_models import ExecutionResult
 
 try:
     from alpaca.trading.client import TradingClient
-    from alpaca.trading.enums import OrderClass, OrderSide, TimeInForce
+    from alpaca.trading.enums import OrderClass, OrderSide, QueryOrderStatus, TimeInForce
     from alpaca.trading.requests import (
         GetOrderByIdRequest,
+        GetOrdersRequest,
         MarketOrderRequest,
         StopLossRequest,
         StopOrderRequest,
@@ -19,8 +20,10 @@ except Exception:  # pragma: no cover - import guarded for local runs without de
     TradingClient = None
     OrderClass = None
     OrderSide = None
+    QueryOrderStatus = None
     TimeInForce = None
     GetOrderByIdRequest = None
+    GetOrdersRequest = None
     MarketOrderRequest = None
     StopLossRequest = None
     StopOrderRequest = None
@@ -87,6 +90,7 @@ class AlpacaClient:
         asset_type: str,
         mode: str = "trade",
         stop_loss: Optional[float] = None,
+        current_position_qty: float = 0.0,
     ) -> ExecutionResult:
         side_normalized = side.lower()
 
@@ -154,7 +158,12 @@ class AlpacaClient:
             return self._place_entry_then_stop_buy(symbol=symbol, qty=qty, stop_loss=stop_loss, asset_type=asset_type)
 
         if side_normalized == "sell":
-            return self._place_exit_sell(symbol=symbol, qty=qty, asset_type=asset_type)
+            return self._place_exit_sell(
+                symbol=symbol,
+                qty=qty,
+                asset_type=asset_type,
+                current_position_qty=current_position_qty,
+            )
 
         return ExecutionResult(
             success=False,
@@ -176,7 +185,7 @@ class AlpacaClient:
             symbol=symbol,
             qty=qty,
             side=OrderSide.BUY,
-            time_in_force=TimeInForce.DAY,
+            time_in_force=TimeInForce.GTC,
             order_class=OrderClass.OTO,
             stop_loss=StopLossRequest(stop_price=stop_loss),
         )
@@ -365,11 +374,45 @@ class AlpacaClient:
             order_class="simple",
         )
 
-    def _place_exit_sell(self, symbol: str, qty: float, asset_type: str) -> ExecutionResult:
+    def _place_exit_sell(self, symbol: str, qty: float, asset_type: str, current_position_qty: float = 0.0) -> ExecutionResult:
         client = self._client
         if client is None:
             return ExecutionResult(False, symbol, "sell", qty, status="skipped", message="No Alpaca client available.", asset_type=asset_type)
         assert client is not None
+
+        protective_orders, discovery_warning = self.find_protective_orders(symbol)
+        if discovery_warning:
+            message = f"SELL blocked for {symbol}: {discovery_warning}"
+            print(message)
+            return ExecutionResult(
+                success=False,
+                symbol=symbol,
+                side="sell",
+                requested_qty=qty,
+                status="protection_reconciliation_failed",
+                message=message,
+                asset_type=asset_type,
+                remaining_position_qty=current_position_qty,
+                protection_reconciled=False,
+            )
+
+        cancellation_result = self._cancel_protective_orders(symbol, protective_orders)
+        if not cancellation_result["ok"]:
+            message = cancellation_result["message"]
+            print(message)
+            return ExecutionResult(
+                success=False,
+                symbol=symbol,
+                side="sell",
+                requested_qty=qty,
+                status="protection_reconciliation_failed",
+                message=message,
+                asset_type=asset_type,
+                cancelled_protective_order_ids=cancellation_result["cancelled_ids"],
+                remaining_position_qty=current_position_qty,
+                protection_reconciled=False,
+            )
+
         tif = TimeInForce.GTC if asset_type == "crypto" or "/" in symbol else TimeInForce.DAY
         order = MarketOrderRequest(
             symbol=symbol,
@@ -380,27 +423,37 @@ class AlpacaClient:
         try:
             submitted_order = client.submit_order(order)
         except Exception as exc:
+            message = (
+                f"CRITICAL: SELL submission failed for {symbol} after protective stop reconciliation; "
+                f"remaining position may be unprotected. error={exc}"
+            )
+            print(message)
             return ExecutionResult(
                 success=False,
                 symbol=symbol,
                 side="sell",
                 requested_qty=qty,
-                status="error",
-                message=str(exc),
+                status="protection_reconciliation_failed",
+                message=message,
                 asset_type=asset_type,
+                cancelled_protective_order_ids=cancellation_result["cancelled_ids"],
+                remaining_position_qty=current_position_qty,
+                protection_reconciled=False,
             )
 
         refreshed_order = self._refresh_order(self._order_identifier(submitted_order), nested=False) or submitted_order
         status = self._status_value(refreshed_order) or self._status_value(submitted_order) or "accepted"
-        return ExecutionResult(
+        filled_qty = max(
+            self._safe_float(getattr(submitted_order, "filled_qty", 0.0)),
+            self._safe_float(getattr(refreshed_order, "filled_qty", 0.0)),
+        )
+        remaining_position_qty = max(0.0, current_position_qty - filled_qty)
+        base_result = ExecutionResult(
             success=self._counts_as_trade(status),
             symbol=symbol,
             side="sell",
             requested_qty=qty,
-            filled_qty=max(
-                self._safe_float(getattr(submitted_order, "filled_qty", 0.0)),
-                self._safe_float(getattr(refreshed_order, "filled_qty", 0.0)),
-            ),
+            filled_qty=filled_qty,
             filled_avg_price=self._safe_optional_float(
                 getattr(refreshed_order, "filled_avg_price", None),
                 fallback=getattr(submitted_order, "filled_avg_price", None),
@@ -414,7 +467,202 @@ class AlpacaClient:
             message="SELL-to-close submitted to Alpaca.",
             asset_type=asset_type,
             order_class=self._order_class_value(refreshed_order) or self._order_class_value(submitted_order),
+            cancelled_protective_order_ids=cancellation_result["cancelled_ids"],
+            remaining_position_qty=remaining_position_qty,
+            protection_reconciled=not protective_orders,
         )
+
+        if filled_qty <= 0.0:
+            base_result.success = False
+            base_result.protection_failed = bool(protective_orders)
+            base_result.protection_reconciled = not protective_orders
+            base_result.status = "protection_reconciliation_pending"
+            base_result.message = (
+                f"CRITICAL: SELL for {symbol} was accepted without a confirmed fill quantity after protection was reconciled; remaining position is uncertain."
+            )
+            print(base_result.message)
+            return base_result
+
+        if remaining_position_qty <= 0.0:
+            stale_orders, stale_warning = self.find_protective_orders(symbol)
+            if stale_warning or stale_orders:
+                message = stale_warning or f"CRITICAL: stale protective order remained open after closing {symbol}."
+                print(message)
+                base_result.success = False
+                base_result.protection_failed = True
+                base_result.protection_reconciled = False
+                base_result.status = "protection_failed"
+                base_result.message = message
+                return base_result
+
+            base_result.protection_reconciled = True
+            base_result.message = "SELL-to-close submitted after protective stop reconciliation."
+            return base_result
+
+        if not protective_orders:
+            base_result.protection_reconciled = True
+            base_result.message = "Partial SELL executed; no active protective stop existed to reconcile."
+            return base_result
+
+        stop_prices = {self._safe_float(getattr(order, "stop_price", None), 0.0) for order in protective_orders if getattr(order, "stop_price", None) is not None}
+        stop_prices.discard(0.0)
+        if len(stop_prices) != 1:
+            message = (
+                f"CRITICAL: partial SELL for {symbol} completed but a replacement stop could not be determined safely from the prior protection set."
+            )
+            print(message)
+            base_result.success = False
+            base_result.protection_failed = True
+            base_result.protection_reconciled = False
+            base_result.status = "protection_failed"
+            base_result.message = message
+            return base_result
+
+        replacement_stop_price = next(iter(stop_prices))
+        replacement_result = self._submit_replacement_stop(symbol, remaining_position_qty, replacement_stop_price)
+        base_result.replacement_protective_order_id = replacement_result["order_id"]
+        base_result.protective_order_id = replacement_result["order_id"]
+        base_result.stop_price = replacement_stop_price
+        base_result.protection_active = replacement_result["ok"]
+        base_result.protection_reconciled = replacement_result["ok"]
+
+        if not replacement_result["ok"]:
+            message = replacement_result["message"]
+            print(message)
+            base_result.success = False
+            base_result.protection_failed = True
+            base_result.status = "protection_failed"
+            base_result.message = message
+            return base_result
+
+        stale_qty = self._open_protective_qty(symbol)
+        if stale_qty > remaining_position_qty + 1e-9:
+            message = (
+                f"CRITICAL: replacement protective stop quantity for {symbol} ({stale_qty:g}) exceeds the remaining long position ({remaining_position_qty:g})."
+            )
+            print(message)
+            base_result.success = False
+            base_result.protection_failed = True
+            base_result.protection_reconciled = False
+            base_result.status = "protection_failed"
+            base_result.message = message
+            return base_result
+
+        base_result.message = "Partial SELL executed and protective stop was replaced for the remaining long quantity."
+        return base_result
+
+    def list_open_orders(self, symbol: Optional[str] = None):
+        if not self._client or not GetOrdersRequest or not QueryOrderStatus:
+            return []
+        client = self._client
+        assert client is not None
+        try:
+            order_filter = GetOrdersRequest(
+                status=QueryOrderStatus.OPEN,
+                nested=True,
+                symbols=[symbol] if symbol else None,
+            )
+            return list(client.get_orders(order_filter))
+        except Exception:
+            return []
+
+    def find_protective_orders(self, symbol: str) -> tuple[list, Optional[str]]:
+        protective_orders: dict[str, Any] = {}
+        ambiguous_sell_orders: list[str] = []
+        for order in self.list_open_orders(symbol):
+            for candidate in self._iter_order_candidates(order):
+                if self._normalize_symbol(getattr(candidate, "symbol", "")) != self._normalize_symbol(symbol):
+                    continue
+                order_id = self._order_identifier(candidate)
+                if not order_id:
+                    continue
+                side = self._side_value(candidate)
+                if side != "sell":
+                    continue
+                if self._is_protective_stop(candidate):
+                    protective_orders[order_id] = candidate
+                else:
+                    ambiguous_sell_orders.append(order_id)
+
+        if ambiguous_sell_orders:
+            return [], (
+                f"unable to reconcile existing SELL orders for {symbol} because non-protective open sell order(s) were present: "
+                f"{', '.join(sorted(ambiguous_sell_orders))}"
+            )
+        return list(protective_orders.values()), None
+
+    def _cancel_protective_orders(self, symbol: str, protective_orders: list) -> dict[str, Any]:
+        if not protective_orders:
+            return {"ok": True, "cancelled_ids": [], "message": None}
+
+        cancelled_ids: list[str] = []
+        for order in protective_orders:
+            order_id = self._order_identifier(order)
+            if not order_id:
+                return {
+                    "ok": False,
+                    "cancelled_ids": cancelled_ids,
+                    "message": f"CRITICAL: protective stop for {symbol} could not be identified for cancellation.",
+                }
+            if not self._cancel_and_verify(order_id):
+                return {
+                    "ok": False,
+                    "cancelled_ids": cancelled_ids,
+                    "message": f"CRITICAL: protective stop cancellation failed for {symbol} on order {order_id}.",
+                }
+            cancelled_ids.append(order_id)
+
+        return {"ok": True, "cancelled_ids": cancelled_ids, "message": None}
+
+    def _cancel_and_verify(self, order_id: str) -> bool:
+        if not self._client:
+            return False
+        client = self._client
+        assert client is not None
+        try:
+            client.cancel_order_by_id(order_id)
+        except Exception:
+            return False
+
+        refreshed = self._refresh_order(order_id, nested=False)
+        return self._status_value(refreshed) in {"canceled", "cancelled"}
+
+    def _submit_replacement_stop(self, symbol: str, qty: float, stop_price: float) -> dict[str, Any]:
+        client = self._client
+        if client is None:
+            return {"ok": False, "order_id": None, "message": f"CRITICAL: no Alpaca client available to replace protection for {symbol}."}
+        assert client is not None
+        try:
+            stop_order = StopOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=OrderSide.SELL,
+                time_in_force=TimeInForce.GTC,
+                stop_price=stop_price,
+            )
+            submitted_stop = client.submit_order(stop_order)
+        except Exception as exc:
+            return {
+                "ok": False,
+                "order_id": None,
+                "message": f"CRITICAL: replacement protective stop placement failed for {symbol}; remaining quantity={qty:g}; error={exc}",
+            }
+
+        refreshed_stop = self._refresh_order(self._order_identifier(submitted_stop), nested=False) or submitted_stop
+        order_id = self._order_identifier(refreshed_stop) or self._order_identifier(submitted_stop)
+        if not order_id:
+            return {
+                "ok": False,
+                "order_id": None,
+                "message": f"CRITICAL: replacement protective stop for {symbol} could not be identified after submission.",
+            }
+        return {"ok": True, "order_id": order_id, "message": None}
+
+    def _open_protective_qty(self, symbol: str) -> float:
+        protective_orders, warning = self.find_protective_orders(symbol)
+        if warning:
+            return float("inf")
+        return sum(self._safe_float(getattr(order, "qty", 0.0)) for order in protective_orders)
 
     def _refresh_order(self, order_id: Optional[str], nested: bool):
         if not self._client or not order_id or not GetOrderByIdRequest:
@@ -488,4 +736,25 @@ class AlpacaClient:
             if cls._status_value(leg) == "stopped":
                 return leg
         return None
+
+    @staticmethod
+    def _side_value(order) -> Optional[str]:
+        side = getattr(order, "side", None)
+        if side is None:
+            return None
+        return getattr(side, "value", str(side)).lower()
+
+    @classmethod
+    def _is_protective_stop(cls, order) -> bool:
+        return cls._side_value(order) == "sell" and getattr(order, "stop_price", None) is not None
+
+    @staticmethod
+    def _normalize_symbol(symbol: str) -> str:
+        return symbol.replace("/", "").upper()
+
+    @staticmethod
+    def _iter_order_candidates(order):
+        yield order
+        for leg in getattr(order, "legs", None) or []:
+            yield leg
 

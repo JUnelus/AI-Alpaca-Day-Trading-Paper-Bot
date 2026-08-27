@@ -2,10 +2,14 @@ name: 🤖 Scheduled Paper Trading Bot
 
 on:
   schedule:
-    # 9:45 AM ET during daylight time (GitHub cron is UTC)
+    # 9:45 AM ET candidate during daylight time (EDT)
     - cron: '45 13 * * 1-5'
-    # 4:15 PM ET during daylight time (GitHub cron is UTC)
+    # 9:45 AM ET candidate during standard time (EST)
+    - cron: '45 14 * * 1-5'
+    # 4:15 PM ET candidate during daylight time (EDT)
     - cron: '15 20 * * 1-5'
+    # 4:15 PM ET candidate during standard time (EST)
+    - cron: '15 21 * * 1-5'
   workflow_dispatch:
     inputs:
       mode:
@@ -25,10 +29,14 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+concurrency:
+  group: alpaca-paper-trading-bot
+  cancel-in-progress: false
+
 jobs:
   scheduled-trade:
     name: Scheduled Trade Run
-    if: github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5' && github.actor != 'github-actions[bot]'
+    if: github.event_name == 'schedule' && (github.event.schedule == '45 13 * * 1-5' || github.event.schedule == '45 14 * * 1-5') && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -51,6 +59,8 @@ jobs:
         run: python -m pytest -q
 
       - name: 🚀  Run scheduled trade mode
+        id: run_bot
+        continue-on-error: true
         env:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
@@ -68,24 +78,29 @@ jobs:
           SMTP_SERVER:       'smtp.gmail.com'
           SMTP_PORT:         '587'
           EMAIL_REQUIRED:    'true'
-        run: python -m src.main --mode trade
+        run: python -m src.main --mode trade --enforce-schedule
 
       - name: 📊  Commit updated dashboard & portfolio state
+        if: always()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name  "github-actions[bot]"
-          git add \
-            README.md \
-            data/portfolio_state.json \
-            data/trade_log.csv \
-            reports/daily_summary.md
+          for file in README.md data/portfolio_state.json data/trade_log.csv reports/daily_summary.md; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
           git diff --staged --quiet \
             || git commit -m "📊 [bot] Portfolio dashboard — $(date -u '+%Y-%m-%d %H:%M UTC')"
           git push
 
+      - name: ❌  Fail job if scheduled trade mode failed
+        if: steps.run_bot.outcome == 'failure'
+        run: exit 1
+
   scheduled-report:
     name: Scheduled Report Run
-    if: github.event_name == 'schedule' && github.event.schedule == '15 20 * * 1-5' && github.actor != 'github-actions[bot]'
+    if: github.event_name == 'schedule' && (github.event.schedule == '15 20 * * 1-5' || github.event.schedule == '15 21 * * 1-5') && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -108,6 +123,8 @@ jobs:
         run: python -m pytest -q
 
       - name: 📨 Run scheduled report mode
+        id: run_bot
+        continue-on-error: true
         env:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
@@ -125,20 +142,25 @@ jobs:
           SMTP_SERVER:       'smtp.gmail.com'
           SMTP_PORT:         '587'
           EMAIL_REQUIRED:    'true'
-        run: python -m src.main --mode report
+        run: python -m src.main --mode report --enforce-schedule
 
       - name: 📊  Commit updated dashboard & portfolio state
+        if: always()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name  "github-actions[bot]"
-          git add \
-            README.md \
-            data/portfolio_state.json \
-            data/trade_log.csv \
-            reports/daily_summary.md
+          for file in README.md data/portfolio_state.json data/trade_log.csv reports/daily_summary.md; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
           git diff --staged --quiet \
             || git commit -m "📊 [bot] Portfolio dashboard — $(date -u '+%Y-%m-%d %H:%M UTC')"
           git push
+
+      - name: ❌  Fail job if scheduled report mode failed
+        if: steps.run_bot.outcome == 'failure'
+        run: exit 1
 
   manual-run:
     name: Manual Paper Bot Run
@@ -165,6 +187,8 @@ jobs:
         run: python -m pytest -q
 
       - name: ▶️  Run manually selected bot mode
+        id: run_bot
+        continue-on-error: true
         env:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
@@ -185,15 +209,20 @@ jobs:
         run: python -m src.main --mode ${{ inputs.mode }}
 
       - name: 📊  Commit updated dashboard & portfolio state
+        if: always()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name  "github-actions[bot]"
-          git add \
-            README.md \
-            data/portfolio_state.json \
-            data/trade_log.csv \
-            reports/daily_summary.md
+          for file in README.md data/portfolio_state.json data/trade_log.csv reports/daily_summary.md; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
           git diff --staged --quiet \
             || git commit -m "📊 [bot] Portfolio dashboard — $(date -u '+%Y-%m-%d %H:%M UTC')"
           git push
+
+      - name: ❌  Fail job if manual bot run failed
+        if: steps.run_bot.outcome == 'failure'
+        run: exit 1
 
