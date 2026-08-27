@@ -1,117 +1,117 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 108242.33,
-  "cash": -120884.08,
-  "buying_power": 89646.6,
+  "account_equity": 110917.68,
+  "cash": -123214.77,
+  "buying_power": 94838.03,
   "positions": [
     {
       "symbol": "AAPL",
       "asset_type": "stock",
       "qty": 70.0,
       "avg_entry_price": 307.565786,
-      "current_price": 311.5,
-      "market_value": 21805.0,
-      "unrealized_pnl": 275.39498,
-      "unrealized_pnl_pct": 1.2791455288853226
+      "current_price": 315.22,
+      "market_value": 22065.4,
+      "unrealized_pnl": 535.79498,
+      "unrealized_pnl_pct": 2.488642868748737
     },
     {
       "symbol": "AMZN",
       "asset_type": "stock",
       "qty": 60.0,
       "avg_entry_price": 249.931667,
-      "current_price": 262.52,
-      "market_value": 15751.2,
-      "unrealized_pnl": 755.29998,
-      "unrealized_pnl_pct": 5.036709893988744
+      "current_price": 255.79,
+      "market_value": 15347.4,
+      "unrealized_pnl": 351.49998,
+      "unrealized_pnl_pct": 2.343973883069407
     },
     {
       "symbol": "AVGO",
       "asset_type": "stock",
-      "qty": 22.0,
-      "avg_entry_price": 380.333637,
-      "current_price": 358.2,
-      "market_value": 7880.4,
-      "unrealized_pnl": -486.940014,
-      "unrealized_pnl_pct": -5.8195318128015066
+      "qty": 23.0,
+      "avg_entry_price": 379.545652,
+      "current_price": 368.78,
+      "market_value": 8481.94,
+      "unrealized_pnl": -247.609996,
+      "unrealized_pnl_pct": -2.836457733943426
     },
     {
       "symbol": "BTC/USD",
       "asset_type": "crypto",
       "qty": 0.229594947,
       "avg_entry_price": 9791.788374942,
-      "current_price": 78861.1,
-      "market_value": 18106.110075,
-      "unrealized_pnl": 15857.964942,
-      "unrealized_pnl_pct": 705.3799467554618
+      "current_price": 80762.26,
+      "market_value": 18542.606804,
+      "unrealized_pnl": 16294.461671,
+      "unrealized_pnl_pct": 724.7958075287119
     },
     {
       "symbol": "ETH/USD",
-      "asset_type": "stock",
+      "asset_type": "crypto",
       "qty": 0.62724,
       "avg_entry_price": 0.0,
-      "current_price": 2504.27,
-      "market_value": 1570.778315,
-      "unrealized_pnl": 1570.778315,
+      "current_price": 2528.531,
+      "market_value": 1585.995784,
+      "unrealized_pnl": 1585.995784,
       "unrealized_pnl_pct": 0.0
     },
     {
       "symbol": "GOOGL",
       "asset_type": "stock",
-      "qty": 33.0,
-      "avg_entry_price": 351.111212,
-      "current_price": 341.8005,
-      "market_value": 11279.4165,
-      "unrealized_pnl": -307.253496,
-      "unrealized_pnl_pct": -2.6517843013227385
+      "qty": 34.0,
+      "avg_entry_price": 350.774118,
+      "current_price": 341.1399,
+      "market_value": 11598.7566,
+      "unrealized_pnl": -327.563412,
+      "unrealized_pnl_pct": -2.7465589693250974
     },
     {
       "symbol": "LLY",
       "asset_type": "stock",
-      "qty": 45.0,
-      "avg_entry_price": 1179.489111,
-      "current_price": 1191.0,
-      "market_value": 53595.0,
-      "unrealized_pnl": 517.990005,
-      "unrealized_pnl_pct": 0.9759215996696047
+      "qty": 46.0,
+      "avg_entry_price": 1179.516957,
+      "current_price": 1187.33,
+      "market_value": 54617.18,
+      "unrealized_pnl": 359.399978,
+      "unrealized_pnl_pct": 0.6623934445056053
     },
     {
       "symbol": "META",
       "asset_type": "stock",
       "qty": 33.0,
       "avg_entry_price": 591.43,
-      "current_price": 578.88,
-      "market_value": 19103.04,
-      "unrealized_pnl": -414.15,
-      "unrealized_pnl_pct": -2.1219755507836937
+      "current_price": 571.06,
+      "market_value": 18844.98,
+      "unrealized_pnl": -672.21,
+      "unrealized_pnl_pct": -3.4441945792401474
     },
     {
       "symbol": "MSFT",
       "asset_type": "stock",
       "qty": 32.0,
       "avg_entry_price": 416.488438,
-      "current_price": 496.2,
-      "market_value": 15878.4,
-      "unrealized_pnl": 2550.769984,
-      "unrealized_pnl_pct": 19.138961547835333
+      "current_price": 503.53,
+      "market_value": 16112.96,
+      "unrealized_pnl": 2785.329984,
+      "unrealized_pnl_pct": 20.898914365541163
     },
     {
       "symbol": "NVDA",
       "asset_type": "stock",
-      "qty": 179.0,
-      "avg_entry_price": 214.626501,
-      "current_price": 218.0006,
-      "market_value": 39022.1074,
-      "unrealized_pnl": 603.963721,
-      "unrealized_pnl_pct": 1.5720793957312846
+      "qty": 181.0,
+      "avg_entry_price": 214.730352,
+      "current_price": 229.031,
+      "market_value": 41454.611,
+      "unrealized_pnl": 2588.417288,
+      "unrealized_pnl_pct": 6.659816773364205
     },
     {
       "symbol": "SOL/USD",
-      "asset_type": "stock",
+      "asset_type": "crypto",
       "qty": 15.41877525,
       "avg_entry_price": 0.0,
-      "current_price": 98.8929,
-      "market_value": 1524.807399,
-      "unrealized_pnl": 1524.807399,
+      "current_price": 109.145,
+      "market_value": 1682.882225,
+      "unrealized_pnl": 1682.882225,
       "unrealized_pnl_pct": 0.0
     },
     {
@@ -119,36 +119,62 @@
       "asset_type": "stock",
       "qty": 6.0,
       "avg_entry_price": 745.443333,
-      "current_price": 770.04,
-      "market_value": 4620.24,
-      "unrealized_pnl": 147.580002,
-      "unrealized_pnl_pct": 3.2996025198873165
+      "current_price": 771.71,
+      "market_value": 4630.26,
+      "unrealized_pnl": 157.600002,
+      "unrealized_pnl_pct": 3.523630279754611
     },
     {
       "symbol": "TSLA",
       "asset_type": "stock",
       "qty": 24.0,
       "avg_entry_price": 432.232083,
-      "current_price": 347.9128,
-      "market_value": 8349.9072,
-      "unrealized_pnl": -2023.662792,
-      "unrealized_pnl_pct": -19.507872348291183
+      "current_price": 354.25,
+      "market_value": 8502.0,
+      "unrealized_pnl": -1871.569992,
+      "unrealized_pnl_pct": -18.041715566033073
     },
     {
       "symbol": "VTI",
       "asset_type": "etf",
       "qty": 28.0,
       "avg_entry_price": 370.042857,
-      "current_price": 380.0,
-      "market_value": 10640.0,
-      "unrealized_pnl": 278.800004,
-      "unrealized_pnl_pct": 2.6908080541600614
+      "current_price": 380.91,
+      "market_value": 10665.48,
+      "unrealized_pnl": 304.280004,
+      "unrealized_pnl_pct": 2.9367255155529186
     }
   ],
-  "total_pnl": 20851.34303,
-  "total_pnl_pct": 208.51343029999998,
-  "yesterday_total_pnl": 21126.31004,
-  "yesterday_equity": 108517.3,
-  "last_updated": "2026-08-26T22:13:21.736198+00:00",
-  "trades_today": 4
+  "total_pnl": 23526.708496,
+  "total_pnl_pct": 235.26708496,
+  "yesterday_total_pnl": 20851.34303,
+  "yesterday_equity": 108242.33,
+  "last_updated": "2026-08-27T17:30:18.486433+00:00",
+  "trades_today": 0,
+  "trading_day": "2026-08-27",
+  "traded_symbols_today": [],
+  "start_of_day_equity": 110926.36,
+  "daily_pnl": 0.0,
+  "daily_loss_limit": 200.0,
+  "daily_loss_triggered": false,
+  "gross_exposure": 234132.452413,
+  "max_total_exposure": 8000.0,
+  "warnings": [
+    "Current gross exposure $234132.45 exceeds the configured limit of $8000.00. New BUY orders are blocked until exposure is reduced.",
+    "Existing AAPL position value $22065.40 exceeds the configured per-position limit of $1000.00.",
+    "Existing AMZN position value $15347.40 exceeds the configured per-position limit of $1000.00.",
+    "Existing AVGO position value $8481.94 exceeds the configured per-position limit of $1000.00.",
+    "Existing BTC/USD position value $18542.61 exceeds the configured per-position limit of $1000.00.",
+    "Existing ETH/USD position value $1586.00 exceeds the configured per-position limit of $1000.00.",
+    "Existing GOOGL position value $11598.76 exceeds the configured per-position limit of $1000.00.",
+    "Existing LLY position value $54617.18 exceeds the configured per-position limit of $1000.00.",
+    "Existing META position value $18844.98 exceeds the configured per-position limit of $1000.00.",
+    "Existing MSFT position value $16112.96 exceeds the configured per-position limit of $1000.00.",
+    "Existing NVDA position value $41454.61 exceeds the configured per-position limit of $1000.00.",
+    "Existing SOL/USD position value $1682.88 exceeds the configured per-position limit of $1000.00.",
+    "Existing SPY position value $4630.26 exceeds the configured per-position limit of $1000.00.",
+    "Existing TSLA position value $8502.00 exceeds the configured per-position limit of $1000.00.",
+    "Existing VTI position value $10665.48 exceeds the configured per-position limit of $1000.00."
+  ],
+  "mode": "report"
 }

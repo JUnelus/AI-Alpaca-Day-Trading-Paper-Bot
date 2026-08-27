@@ -1570,3 +1570,13 @@
 2026-08-26T22:13:21.707501+00:00,BTC/USD,hold,0.55,1.0,0.019,78785.41,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
 2026-08-26T22:13:21.707604+00:00,META,hold,0.55,1.0,2.0,576.14,False,Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.
 2026-08-26T22:13:21.707682+00:00,LLY,buy,1.0,1.0,1.0,1177.52,True,Approved
+2026-08-27T17:30:18.324493+00:00,NVDA,sell,1.0,1.0,4.0,231.35,False,Rejected: report mode cannot place orders.,,False,,,,,False,False,,
+2026-08-27T17:30:18.324654+00:00,AAPL,hold,0.55,1.0,3.0,315.28,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.,,False,,,,,False,False,,
+2026-08-27T17:30:18.324761+00:00,GOOGL,hold,0.55,1.0,2.0,341.15,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.,,False,,,,,False,False,,
+2026-08-27T17:30:18.324857+00:00,MSFT,hold,0.55,1.0,1.0,503.75,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.,,False,,,,,False,False,,
+2026-08-27T17:30:18.324955+00:00,AMZN,buy,0.9644614202274825,1.0,1.0,253.34,False,Rejected: report mode cannot place orders.,,False,,,,,False,False,,
+2026-08-27T17:30:18.325050+00:00,VTI,hold,0.55,1.0,2.0,381.01,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.,,False,,,,,False,False,,
+2026-08-27T17:30:18.325169+00:00,AVGO,hold,0.55,1.0,2.0,368.78,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.,,False,,,,,False,False,,
+2026-08-27T17:30:18.325267+00:00,BTC/USD,hold,0.55,1.0,0.0123,80762.26,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade.,,False,,,,,False,False,,
+2026-08-27T17:30:18.325361+00:00,META,buy,0.8256084598698498,1.0,0.0001,565.35,False,Rejected: report mode cannot place orders. | Rejected: quantity must be positive.,,False,,,,,False,False,,
+2026-08-27T17:30:18.325453+00:00,LLY,hold,0.55,1.0,0.0001,1187.33,False,Rejected: report mode cannot place orders. | Rejected: confidence 0.55 below 0.70. | Rejected: hold signal does not place a trade. | Rejected: quantity must be positive.,,False,,,,,False,False,,
