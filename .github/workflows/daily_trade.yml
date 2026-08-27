@@ -1,13 +1,21 @@
-name: 🤖 Daily Trading Bot
+name: 🤖 Scheduled Paper Trading Bot
 
 on:
-  push:
   schedule:
-    # 9:45 AM ET Mon–Fri — place day orders at market open
+    # 9:45 AM ET during daylight time (GitHub cron is UTC)
     - cron: '45 13 * * 1-5'
-    # 4:15 PM ET Mon–Fri — update portfolio & dashboard after close
-    - cron: '15 21 * * 1-5'
-  workflow_dispatch:   # allows manual trigger from the Actions tab
+    # 4:15 PM ET during daylight time (GitHub cron is UTC)
+    - cron: '15 20 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Execution mode for the paper-trading bot
+        required: true
+        default: report
+        type: choice
+        options:
+          - report
+          - trade
 
 permissions:
   contents: write       # needed to push README + data files back to repo
@@ -18,20 +26,18 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  trade-and-dashboard:
-    name: Run Bot & Refresh Dashboard
-    if: github.actor != 'github-actions[bot]'
+  scheduled-trade:
+    name: Scheduled Trade Run
+    if: github.event_name == 'schedule' && github.event.schedule == '45 13 * * 1-5' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      # ── checkout ────────────────────────────────────────────────────────────
       - name: ⬇️  Checkout repository
         uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── python ──────────────────────────────────────────────────────────────
       - name: 🐍  Set up Python 3.12
         uses: actions/setup-python@v6
         with:
@@ -44,23 +50,140 @@ jobs:
       - name: ✅ Run tests
         run: python -m pytest -q
 
-      # ── bot ─────────────────────────────────────────────────────────────────
-      - name: 🚀  Run trading bot
+      - name: 🚀  Run scheduled trade mode
         env:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_PAPER:      'true'
-          MIN_CONFIDENCE:    '0.70'
-          MAX_RISK_PERCENT:  '1'
+          PORTFOLIO_SIZE:    '10000'
+          MAX_POSITION_PERCENT: '10'
+          MAX_DAILY_LOSS_PERCENT: '2'
+          MAX_DAILY_TRADES: '3'
+          MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          ALLOW_MARGIN:      'false'
+          ALLOW_SHORTS:      'false'
           SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD:   ${{ secrets.SENDER_PASSWORD }}
           RECIPIENT_EMAIL:   ${{ secrets.RECIPIENT_EMAIL }}
           SMTP_SERVER:       'smtp.gmail.com'
           SMTP_PORT:         '587'
           EMAIL_REQUIRED:    'true'
-        run: python -m src.main
+        run: python -m src.main --mode trade
 
-      # ── commit back ─────────────────────────────────────────────────────────
+      - name: 📊  Commit updated dashboard & portfolio state
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name  "github-actions[bot]"
+          git add \
+            README.md \
+            data/portfolio_state.json \
+            data/trade_log.csv \
+            reports/daily_summary.md
+          git diff --staged --quiet \
+            || git commit -m "📊 [bot] Portfolio dashboard — $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
+
+  scheduled-report:
+    name: Scheduled Report Run
+    if: github.event_name == 'schedule' && github.event.schedule == '15 20 * * 1-5' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: ⬇️  Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍  Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 📦  Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: ✅ Run tests
+        run: python -m pytest -q
+
+      - name: 📨 Run scheduled report mode
+        env:
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER:      'true'
+          PORTFOLIO_SIZE:    '10000'
+          MAX_POSITION_PERCENT: '10'
+          MAX_DAILY_LOSS_PERCENT: '2'
+          MAX_DAILY_TRADES: '3'
+          MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          ALLOW_MARGIN:      'false'
+          ALLOW_SHORTS:      'false'
+          SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD:   ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENT_EMAIL:   ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_SERVER:       'smtp.gmail.com'
+          SMTP_PORT:         '587'
+          EMAIL_REQUIRED:    'true'
+        run: python -m src.main --mode report
+
+      - name: 📊  Commit updated dashboard & portfolio state
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name  "github-actions[bot]"
+          git add \
+            README.md \
+            data/portfolio_state.json \
+            data/trade_log.csv \
+            reports/daily_summary.md
+          git diff --staged --quiet \
+            || git commit -m "📊 [bot] Portfolio dashboard — $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
+
+  manual-run:
+    name: Manual Paper Bot Run
+    if: github.event_name == 'workflow_dispatch' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: ⬇️  Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍  Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 📦  Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: ✅ Run tests
+        run: python -m pytest -q
+
+      - name: ▶️  Run manually selected bot mode
+        env:
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER:      'true'
+          PORTFOLIO_SIZE:    '10000'
+          MAX_POSITION_PERCENT: '10'
+          MAX_DAILY_LOSS_PERCENT: '2'
+          MAX_DAILY_TRADES: '3'
+          MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          ALLOW_MARGIN:      'false'
+          ALLOW_SHORTS:      'false'
+          SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD:   ${{ secrets.SENDER_PASSWORD }}
+          RECIPIENT_EMAIL:   ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_SERVER:       'smtp.gmail.com'
+          SMTP_PORT:         '587'
+          EMAIL_REQUIRED:    'true'
+        run: python -m src.main --mode ${{ inputs.mode }}
+
       - name: 📊  Commit updated dashboard & portfolio state
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"

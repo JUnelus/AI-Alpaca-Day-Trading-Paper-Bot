@@ -81,7 +81,7 @@ def _build_html_email(state, executed_trades, open_positions, predictions) -> st
 
     # P&L summary
     equity_color = "green" if state.total_pnl >= 0 else "red"
-    yesterday_delta = state.total_pnl - state.yesterday_total_pnl
+    yesterday_delta = state.total_pnl - state.yesterday_total_pnl if state.yesterday_total_pnl is not None else 0.0
     yesterday_color = "green" if yesterday_delta >= 0 else "red"
 
     executed_table = _build_trades_table(executed_trades)
@@ -155,7 +155,7 @@ def _build_html_email(state, executed_trades, open_positions, predictions) -> st
                 <tr>
                     <td><strong>Yesterday-to-today P&L</strong></td>
                     <td class="{'positive' if yesterday_delta >= 0 else 'negative'}">
-                        ${yesterday_delta:+,.2f}
+                        {'Not available yet' if state.yesterday_total_pnl is None else f'${yesterday_delta:+,.2f}'}
                     </td>
                 </tr>
             </table>

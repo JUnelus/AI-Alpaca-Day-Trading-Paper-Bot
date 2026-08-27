@@ -1,24 +1,33 @@
 # AI-Alpaca-Day-Trading-Paper-Bot
 
-AI-powered day trading paper bot using Alpaca API, Python, risk management, and automated trade analytics.
+AI-powered Alpaca **paper-trading** bot using Python, risk management, structured AI decisions, and automated trade analytics.
 
-**$10,000 paper portfolio · 10 symbols (stocks + crypto) · fully automated · GitHub Actions daily schedule**
+**$10,000 configured paper portfolio · 10 symbols · fail-closed safety checks · GitHub Actions trade/report schedules**
+
+> This repository remains **Alpaca paper-trading only**. No supported path in this repo enables Alpaca live trading.
 
 ---
 
 ## 🏗️ Architecture
 
-```
-Market Data → Strategy Rules → AI Agent Decision → Risk Manager → Alpaca Paper Trade → Trade Log / Dashboard
+```text
+Market Data (fresh Alpaca snapshots only for trade mode)
+    → Strategy Rules
+    → AI Agent Decision
+    → Centralized Risk Manager
+    → Protected Alpaca Paper Execution
+    → Trade Log / Portfolio State / Dashboard / Email Report
 ```
 
 The AI agent returns **structured decisions only** — it never places orders directly.
+Order placement is allowed only when `--mode trade` is active.
 
 ## 📁 Project Structure
 
 ```text
 ai-alpaca-day-trading-paper-bot/
-├── .github/workflows/daily_trade.yml   ← GitHub Actions (9:45 AM & 4:15 PM ET)
+├── .github/workflows/ci.yml            ← Push / PR tests only
+├── .github/workflows/daily_trade.yml   ← Scheduled/manual paper bot runs
 ├── .env.example
 ├── requirements.txt
 ├── config/
@@ -58,30 +67,80 @@ ai-alpaca-day-trading-paper-bot/
 |  9 | ETH/USD | Ethereum            | CRYPTO |
 | 10 | SOL/USD | Solana              | CRYPTO |
 
-## 🛡️ Risk Rules
+## 🛡️ Safety Controls
 
-| Rule                       | Policy                                     |
-|:---------------------------|:-------------------------------------------|
-| Trading mode               | Paper only                                 |
-| Max symbols                | 10                                         |
-| Watchlist refresh          | Weekly top-10 by market value             |
-| Entry style                | DCA on dips for quality assets            |
-| Max trades per symbol/day  | 1                                          |
-| Max account risk per trade | 1 %                                        |
-| Min AI confidence          | 70 %                                       |
-| Margin                     | ❌ Not permitted                            |
-| Stop loss                  | Required on every trade                    |
-| Logging                    | Every decision (approved **and** rejected) |
+| Rule | Policy |
+|:-----|:-------|
+| Trading venue | Alpaca **paper** account only |
+| Runtime modes | `trade` may place orders; `report` can never place orders |
+| Watchlist refresh | Weekly top-10 by market value |
+| Entry logic | Existing strategy / AI logic preserved, but enforced through fail-closed risk checks |
+| Min AI confidence | `MIN_CONFIDENCE=0.70` |
+| Max account risk per trade | `MAX_RISK_PERCENT=1` |
+| Portfolio budget | `PORTFOLIO_SIZE=10000` |
+| Max position size | `MAX_POSITION_PERCENT=10` (default $1,000 per symbol) |
+| Max total gross exposure | `MAX_TOTAL_EXPOSURE_PERCENT=80` (default $8,000) |
+| Daily trade cap | `MAX_DAILY_TRADES=3` across the whole bot |
+| Per-symbol trade cap | Max 1 executed trade per symbol per trading day |
+| Daily loss circuit breaker | `MAX_DAILY_LOSS_PERCENT=2` blocks new BUYs after the threshold is hit |
+| Margin | `ALLOW_MARGIN=false` |
+| Shorts | `ALLOW_SHORTS=false` |
+| Protective stop policy | New long stock/ETF BUYs must have broker-side stop protection or the entry is rejected |
+| Crypto BUY safety | Rejected whenever reliable broker-side protective stops cannot be guaranteed |
+| Market-data safety | Fallback/demo prices are **never** eligible for paper-order execution |
+| Logging | Every decision is logged, including execution status, protection state, order IDs, and rejection reasons |
+
+### Default Safety Configuration
+
+These values live in `config/watchlist.json` and can be overridden in `.env`:
+
+```dotenv
+PORTFOLIO_SIZE=10000
+MAX_POSITION_PERCENT=10
+MAX_DAILY_LOSS_PERCENT=2
+MAX_DAILY_TRADES=3
+MAX_TOTAL_EXPOSURE_PERCENT=80
+ALLOW_MARGIN=false
+ALLOW_SHORTS=false
+MIN_CONFIDENCE=0.70
+MAX_RISK_PERCENT=1
+```
+
+### Protective Stop Behavior
+
+- For new long **stock/ETF BUY** orders, the bot submits broker-side protection through Alpaca-supported attached stop logic when available.
+- If the bot cannot reliably create that protective stop, it **rejects the BUY** instead of placing an unprotected entry.
+- If an entry is accepted/executed but protection confirmation fails, the run records a **critical protection failure** and does not treat the trade as safely protected.
+- Normal long **SELL-to-close** orders do not create a new entry-style stop.
+
+### Market Data Safety
+
+- `trade` mode requires fresh Alpaca market data.
+- If fresh data is missing for a symbol, that symbol is not traded.
+- If the overall market-data service is unavailable, the bot places **zero** orders.
+- Hard-coded fallback/demo prices are limited to tests and explicit local reporting/simulation flows such as `--mode report --allow-fallback-data`.
 
 ## ⚙️ GitHub Actions Setup
 
 1. Go to **Settings → Secrets and variables → Actions** in your repo.
-2. Add two repository secrets:
+2. Add your repository secrets:
    - `ALPACA_API_KEY`
    - `ALPACA_SECRET_KEY`
-3. The workflow at `.github/workflows/daily_trade.yml` runs automatically:
-   - **9:45 AM ET** Mon–Fri — place day orders
-   - **4:15 PM ET** Mon–Fri — update portfolio and dashboard
+   - `SENDER_EMAIL`
+   - `SENDER_PASSWORD`
+   - `RECIPIENT_EMAIL`
+3. Workflow behavior is split for safety:
+   - `.github/workflows/ci.yml`
+     - runs on `push` and `pull_request`
+     - installs dependencies and runs `python -m pytest -q`
+     - **never** places broker orders
+   - `.github/workflows/daily_trade.yml`
+     - scheduled morning run: `python -m src.main --mode trade`
+     - scheduled afternoon run: `python -m src.main --mode report`
+     - manual runs require an explicit mode choice and default to `report`
+     - every bot run forces `ALPACA_PAPER=true`
+
+> GitHub cron uses UTC. The current workflow targets 9:45 AM ET and 4:15 PM ET during daylight time.
 
 ## 🚀 Local Quick Start
 
@@ -91,8 +150,16 @@ python -m venv .venv
 pip install -r requirements.txt
 Copy-Item .env.example .env          # then fill in your keys
 python -m pytest -q                  # run tests
-python -m src.main                   # run one full cycle
+python -m src.main --mode report     # safe default: reporting/dashboard only
+python -m src.main --mode trade      # paper-trading run with risk checks and broker orders
+python -m src.main --mode report --allow-fallback-data   # explicit local simulation/reporting only
 ```
+
+## 📌 Execution Notes
+
+- Existing strategy logic, AI decisioning, dashboard updates, email reporting, trade logging, and weekly watchlist refresh are preserved.
+- The hardened risk layer prevents DCA logic from bypassing per-position or total-exposure limits.
+- Existing oversized paper positions are **not** auto-liquidated. The bot warns, blocks additional exposure, and still allows risk-reducing exits.
 
 ---
 

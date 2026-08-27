@@ -61,7 +61,7 @@ def generate_dashboard(
         "",
         "| Metric | Value |",
         "|:-------|------:|",
-        f"| 🏦 Starting Balance  | `$10,000.00` |",
+        f"| 🏦 Starting Balance  | `${state.starting_balance:,.2f}` |",
         f"| 💵 Current Equity    | `${state.account_equity:,.2f}` |",
         f"| 💸 Cash Available    | `${state.cash:,.2f}` |",
         f"| 🧾 Buying Power      | `${state.buying_power:,.2f}` |",
@@ -69,6 +69,14 @@ def generate_dashboard(
         f"&nbsp; `({_fmt_pct(state.total_pnl_pct)})` |",
         "",
     ]
+
+    if state.warnings:
+        lines += [
+            "### ⚠️ Safety Warnings",
+            "",
+        ]
+        lines.extend(f"- {warning}" for warning in state.warnings)
+        lines.append("")
 
     # ── written summary ─────────────────────────────────────────────────────────
     day_pnl = None
@@ -89,10 +97,9 @@ def generate_dashboard(
     executed = []
     for result in run_results or []:
         decision = result.get("decision", {})
-        risk = result.get("risk", {})
         action = str(decision.get("action", "hold")).lower()
-        approved = bool(risk.get("approved", False))
-        if action in {"buy", "sell"} and approved:
+        order_result = result.get("order_result") or {}
+        if action in {"buy", "sell"} and order_result.get("counts_as_trade"):
             executed.append(result)
 
     if executed:

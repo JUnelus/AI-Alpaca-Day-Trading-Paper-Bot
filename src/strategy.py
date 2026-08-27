@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
@@ -6,6 +7,10 @@ class MarketSnapshot:
     symbol: str
     last_price: float
     day_change_percent: float
+    source: str = "alpaca"
+    timestamp: datetime | None = None
+    is_fresh: bool = False
+    is_fallback: bool = False
 
 
 @dataclass
