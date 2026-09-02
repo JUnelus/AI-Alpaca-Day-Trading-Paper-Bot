@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional, Union
 
 from .execution_models import ExecutionResult
-from .time_utils import iso_to_trading_day
+from .time_utils import ensure_aware, iso_to_trading_day
 
 
 def _ensure_parent(path: str) -> None:
@@ -28,14 +28,16 @@ def log_ai_decision(
     reasons: list[str],
     notes: Optional[list[str]] = None,
     execution_result: Optional[Union[ExecutionResult, dict]] = None,
+    now: Optional[datetime] = None,
 ) -> None:
     _ensure_parent(path)
     execution = _execution_dict(execution_result)
+    timestamp = ensure_aware(now or datetime.now(timezone.utc)).isoformat()
     with open(path, "a", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(
             [
-                datetime.now(timezone.utc).isoformat(),
+                timestamp,
                 decision.get("symbol"),
                 decision.get("action"),
                 decision.get("confidence"),

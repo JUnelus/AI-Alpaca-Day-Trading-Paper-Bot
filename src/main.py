@@ -465,7 +465,7 @@ def run_once(
                     current_gross_exposure,
                 )
 
-        log_ai_decision(log_path, decision, risk.approved, risk.reasons, risk.notes, order_result)
+        log_ai_decision(log_path, decision, risk.approved, risk.reasons, risk.notes, order_result, now=run_time)
 
         signal_map[sym] = {
             "action": decision["action"],
