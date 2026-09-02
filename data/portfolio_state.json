@@ -1,8 +1,8 @@
 {
   "starting_balance": 10000.0,
-  "account_equity": 106818.18,
+  "account_equity": 106806.72,
   "cash": -123214.78,
-  "buying_power": 86113.84,
+  "buying_power": 86067.75,
   "positions": [
     {
       "symbol": "AAPL",
@@ -42,11 +42,11 @@
       "asset_type": "crypto",
       "qty": 0.229594947,
       "avg_entry_price": 9791.788374942,
-      "current_price": 77359.39,
-      "market_value": 17761.325047,
+      "current_price": 77381.5,
+      "market_value": 17766.401391,
       "cost_basis": 2248.145133,
-      "unrealized_pnl": 15513.179914,
-      "unrealized_pnl_pct": 690.044
+      "unrealized_pnl": 15518.256258,
+      "unrealized_pnl_pct": 690.269
     },
     {
       "symbol": "ETH/USD",
@@ -108,11 +108,11 @@
       "asset_type": "stock",
       "qty": 181.0,
       "avg_entry_price": 214.730352,
-      "current_price": 217.27,
-      "market_value": 39325.87,
+      "current_price": 217.18,
+      "market_value": 39309.58,
       "cost_basis": 38866.193712,
-      "unrealized_pnl": 459.676288,
-      "unrealized_pnl_pct": 1.183
+      "unrealized_pnl": 443.386288,
+      "unrealized_pnl_pct": 1.141
     },
     {
       "symbol": "SOL/USD",
@@ -141,11 +141,11 @@
       "asset_type": "stock",
       "qty": 24.0,
       "avg_entry_price": 432.232083,
-      "current_price": 355.94,
-      "market_value": 8542.56,
+      "current_price": 355.93,
+      "market_value": 8542.32,
       "cost_basis": 10373.569992,
-      "unrealized_pnl": -1831.009992,
-      "unrealized_pnl_pct": -17.651
+      "unrealized_pnl": -1831.249992,
+      "unrealized_pnl_pct": -17.653
     },
     {
       "symbol": "VTI",
@@ -159,39 +159,40 @@
       "unrealized_pnl_pct": 1.34
     }
   ],
-  "total_pnl": 19427.214259,
-  "total_pnl_pct": 194.27214259000002,
+  "total_pnl": 19415.760603,
+  "total_pnl_pct": 194.15760602999998,
   "yesterday_total_pnl": 22422.691093999998,
   "yesterday_equity": 109813.67,
-  "last_updated": "2026-09-02T04:23:05.656148+00:00",
+  "last_updated": "2026-09-02T04:24:11.304628+00:00",
   "trades_today": 0,
   "trading_day": "2026-09-02",
   "traded_symbols_today": [],
   "start_of_day_equity": 106818.18,
-  "daily_pnl": 0.0,
+  "daily_pnl": -11.459999999991851,
   "daily_loss_limit": 200.0,
   "daily_loss_triggered": false,
-  "gross_exposure": 230032.95817600001,
+  "gross_exposure": 230021.50452,
   "max_total_exposure": 8000.0,
   "warnings": [
-    "Current gross exposure $230032.96 exceeds the configured limit of $8000.00. New BUY orders are blocked until exposure is reduced.",
+    "Current gross exposure $230021.50 exceeds the configured limit of $8000.00. New BUY orders are blocked until exposure is reduced.",
     "LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $10,000 strategy controls were enforced.",
     "Existing AAPL position value $22715.00 exceeds the configured per-position limit of $1000.00.",
     "Existing AMZN position value $15231.00 exceeds the configured per-position limit of $1000.00.",
     "Existing AVGO position value $8506.55 exceeds the configured per-position limit of $1000.00.",
-    "Existing BTC/USD position value $17761.33 exceeds the configured per-position limit of $1000.00.",
+    "Existing BTC/USD position value $17766.40 exceeds the configured per-position limit of $1000.00.",
     "Existing ETH/USD position value $1512.97 exceeds the configured per-position limit of $1000.00.",
     "Existing GOOGL position value $11445.76 exceeds the configured per-position limit of $1000.00.",
     "Existing LLY position value $53394.96 exceeds the configured per-position limit of $1000.00.",
     "Existing META position value $19010.97 exceeds the configured per-position limit of $1000.00.",
     "Existing MSFT position value $15978.24 exceeds the configured per-position limit of $1000.00.",
-    "Existing NVDA position value $39325.87 exceeds the configured per-position limit of $1000.00.",
+    "Existing NVDA position value $39309.58 exceeds the configured per-position limit of $1000.00.",
     "Existing SOL/USD position value $1541.88 exceeds the configured per-position limit of $1000.00.",
     "Existing SPY position value $4565.88 exceeds the configured per-position limit of $1000.00.",
-    "Existing TSLA position value $8542.56 exceeds the configured per-position limit of $1000.00.",
-    "Existing VTI position value $10500.00 exceeds the configured per-position limit of $1000.00."
+    "Existing TSLA position value $8542.32 exceeds the configured per-position limit of $1000.00.",
+    "Existing VTI position value $10500.00 exceeds the configured per-position limit of $1000.00.",
+    "Fresh market data was unavailable for: AAPL, AMZN, AVGO, GOOGL, LLY, META, MSFT, NVDA, VTI. Those symbols were not traded."
   ],
-  "mode": "report",
+  "mode": "trade",
   "last_scheduled_trade_day": "",
   "last_scheduled_report_day": "2026-08-27",
   "pnl_data_complete": true,
