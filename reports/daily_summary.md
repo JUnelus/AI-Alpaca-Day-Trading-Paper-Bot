@@ -1,44 +1,43 @@
-# Daily Summary — 2026-09-09
+# Daily Summary — 2026-09-10
 
-- Run mode: `report`
+- Run mode: `trade`
 ## 💰 Portfolio
 - Configured strategy budget: $10,000.00
 - Strategy max gross exposure: $8,000.00
-- Alpaca paper account equity: $108,086.74
-- Broker cash: $-121,950.29
-- Broker buying power: $90,174.29
-- Actual broker gross exposure: $230,037.03
-- Broker position P&L: $+20,576.40 (+205.76%)
-- Daily P&L (final equity - start of day): $-994.56
-- Trades executed today: 1
+- Alpaca paper account equity: $106,623.05
+- Broker cash: $-121,950.33
+- Broker buying power: $87,068.47
+- Actual broker gross exposure: $228,572.13
+- Broker position P&L: $+19,071.31 (+190.71%)
+- Daily P&L (final equity - start of day): $+13.85
+- Trades executed today: 0
 
 ## ⚠️ Safety Status
-- Current gross exposure $230037.03 exceeds the configured limit of $8000.00. New BUY orders are blocked until exposure is reduced.
+- Current gross exposure $228572.13 exceeds the configured limit of $8000.00. New BUY orders are blocked until exposure is reduced.
 - LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $10,000 strategy controls were enforced.
-- Existing AAPL position value $22123.50 exceeds the configured per-position limit of $1000.00.
-- Existing AMZN position value $15147.60 exceeds the configured per-position limit of $1000.00.
-- Existing AVGO position value $8380.74 exceeds the configured per-position limit of $1000.00.
-- Existing BTC/USD position value $17971.38 exceeds the configured per-position limit of $1000.00.
-- Existing ETH/USD position value $1545.51 exceeds the configured per-position limit of $1000.00.
-- Existing GOOGL position value $11242.10 exceeds the configured per-position limit of $1000.00.
-- Existing LLY position value $51713.66 exceeds the configured per-position limit of $1000.00.
-- Existing META position value $20192.47 exceeds the configured per-position limit of $1000.00.
-- Existing MSFT position value $15732.80 exceeds the configured per-position limit of $1000.00.
-- Existing NVDA position value $40495.18 exceeds the configured per-position limit of $1000.00.
-- Existing SOL/USD position value $1578.20 exceeds the configured per-position limit of $1000.00.
-- Existing SPY position value $4575.19 exceeds the configured per-position limit of $1000.00.
-- Existing TSLA position value $8827.44 exceeds the configured per-position limit of $1000.00.
-- Existing VTI position value $10511.24 exceeds the configured per-position limit of $1000.00.
-- Daily loss circuit breaker triggered: Start-of-day equity: $109081.30; Current equity: $108086.74; Daily P&L: $-994.56; Limit: -$200.00.
+- Existing AAPL position value $22427.65 exceeds the configured per-position limit of $1000.00.
+- Existing AMZN position value $15099.53 exceeds the configured per-position limit of $1000.00.
+- Existing AVGO position value $8286.90 exceeds the configured per-position limit of $1000.00.
+- Existing BTC/USD position value $17698.27 exceeds the configured per-position limit of $1000.00.
+- Existing ETH/USD position value $1520.30 exceeds the configured per-position limit of $1000.00.
+- Existing GOOGL position value $11171.04 exceeds the configured per-position limit of $1000.00.
+- Existing LLY position value $51839.24 exceeds the configured per-position limit of $1000.00.
+- Existing META position value $20003.37 exceeds the configured per-position limit of $1000.00.
+- Existing MSFT position value $15707.19 exceeds the configured per-position limit of $1000.00.
+- Existing NVDA position value $39494.20 exceeds the configured per-position limit of $1000.00.
+- Existing SOL/USD position value $1536.17 exceeds the configured per-position limit of $1000.00.
+- Existing SPY position value $4550.52 exceeds the configured per-position limit of $1000.00.
+- Existing TSLA position value $8776.80 exceeds the configured per-position limit of $1000.00.
+- Existing VTI position value $10460.94 exceeds the configured per-position limit of $1000.00.
 
 ## 🤖 AI Decisions
-- **NVDA** — BUY (conf=0.83) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for NVDA (source=alpaca).
-- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AAPL (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **GOOGL** — BUY (conf=1.00) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for GOOGL (source=alpaca).
-- **MSFT** — BUY (conf=0.76) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for MSFT (source=alpaca).; Rejected: quantity must be positive.
-- **AMZN** — BUY (conf=0.98) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AMZN (source=alpaca).
-- **VTI** — BUY (conf=0.76) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for VTI (source=alpaca).; Rejected: quantity must be positive.
-- **AVGO** — BUY (conf=0.85) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AVGO (source=alpaca).; Rejected: quantity must be positive.
-- **META** — SELL (conf=1.00) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: max 1 trade per symbol per day exceeded.
-- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for LLY (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **NVDA** — BUY (conf=1.00) → ❌ REJECTED: Rejected: projected NVDA position would exceed the $1000.00 max-position limit.; Rejected: projected exposure would exceed the $8000.00 max-total-exposure limit.; Rejected: configured portfolio budget is fully deployed.; Rejected: no margin allowed; insufficient configured available cash.
+- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **GOOGL** — BUY (conf=0.79) → ❌ REJECTED: Rejected: projected GOOGL position would exceed the $1000.00 max-position limit.; Rejected: projected exposure would exceed the $8000.00 max-total-exposure limit.; Rejected: configured portfolio budget is fully deployed.; Rejected: no margin allowed; insufficient configured available cash.
+- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AMZN** — BUY (conf=0.73) → ❌ REJECTED: Rejected: projected AMZN position would exceed the $1000.00 max-position limit.; Rejected: projected exposure would exceed the $8000.00 max-total-exposure limit.; Rejected: configured portfolio budget is fully deployed.; Rejected: no margin allowed; insufficient configured available cash.
+- **VTI** — BUY (conf=0.76) → ❌ REJECTED: Rejected: quantity must be positive.
+- **AVGO** — BUY (conf=0.85) → ❌ REJECTED: Rejected: quantity must be positive.
+- **META** — BUY (conf=0.85) → ❌ REJECTED: Rejected: quantity must be positive.
+- **BTC/USD** — BUY (conf=0.92) → ❌ REJECTED: Rejected: unable to guarantee broker-side protective stop placement for BTC/USD.
+- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
