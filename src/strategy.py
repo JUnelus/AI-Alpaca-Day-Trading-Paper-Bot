@@ -55,7 +55,8 @@ def market_filter_reason(market_context: MarketContext) -> str | None:
 
     Fails closed: with no fresh benchmark the filter cannot clear the market, so dip buys wait.
     """
-    if not market_context.benchmark_changes:
+    if market_context.unavailable or not market_context.benchmark_changes:
+        # Worst-of-SPY/QQQ is only meaningful with both; a missing one could be the one below the line.
         missing = ", ".join(market_context.unavailable) or "none requested"
         return f"Market filter: benchmark data unavailable ({missing}); dip buys suspended"
     symbol, change = min(market_context.benchmark_changes.items(), key=lambda item: item[1])
