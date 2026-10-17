@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 
 from .strategy import StrategySignal
@@ -17,14 +19,19 @@ class AIDecision:
         return asdict(self)
 
 
+# Protective stop distance from entry. 1% sat inside the normal intraday range of the mega-cap
+# names and converted ordinary noise into realized losses; 2% is paired with a halved DCA budget
+# so the dollar risk per position is unchanged.
+STOP_LOSS_PERCENT = 2.0
+
+
 def build_decision(signal: StrategySignal, last_price: float, default_qty: float = 1.0) -> AIDecision:
     confidence = max(0.0, min(1.0, signal.strength))
 
-    # Require stop loss in all non-hold decisions.
     if signal.action == "buy":
-        stop_loss = round(last_price * 0.99, 2)
+        stop_loss = round(last_price * (1.0 - STOP_LOSS_PERCENT / 100.0), 2)
     elif signal.action == "sell":
-        stop_loss = round(last_price * 1.01, 2)
+        stop_loss = round(last_price * (1.0 + STOP_LOSS_PERCENT / 100.0), 2)
     else:
         stop_loss = round(last_price, 2)
 
@@ -37,3 +44,4 @@ def build_decision(signal: StrategySignal, last_price: float, default_qty: float
         qty=max(0.0001, float(default_qty)),
         stop_loss=stop_loss,
     )
+
