@@ -105,6 +105,7 @@ def _snapshot_from_alpaca_snapshot(symbol: str, asset_type: str, snapshot, as_of
         timestamp=timestamp,
         is_fresh=is_fresh,
         is_fallback=False,
+        day_change_available=bool(prev_close_value),
     )
 
 

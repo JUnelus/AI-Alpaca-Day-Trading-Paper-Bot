@@ -13,6 +13,8 @@ class MarketSnapshot:
     timestamp: datetime | None = None
     is_fresh: bool = False
     is_fallback: bool = False
+    # False when the provider could not compute the day change (no previous close); the stored 0.0 is a placeholder.
+    day_change_available: bool = True
 
 
 @dataclass
@@ -43,7 +45,7 @@ def build_market_context(snapshots: dict[str, MarketSnapshot], benchmarks: tuple
     unavailable: list[str] = []
     for symbol in benchmarks:
         snapshot = snapshots.get(symbol)
-        if snapshot is None or not snapshot.is_fresh or snapshot.last_price <= 0:
+        if snapshot is None or not snapshot.is_fresh or snapshot.last_price <= 0 or not snapshot.day_change_available:
             unavailable.append(symbol)
         else:
             changes[symbol] = snapshot.day_change_percent
