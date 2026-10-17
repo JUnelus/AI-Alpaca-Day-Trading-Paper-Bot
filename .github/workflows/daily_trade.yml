@@ -2,7 +2,7 @@ name: 🤖 Scheduled Paper Trading Bot
 
 on:
   schedule:
-    - cron: '45 9 * * 1-5'
+    - cron: '15 10 * * 1-5'
       timezone: 'America/New_York'
     - cron: '15 16 * * 1-5'
       timezone: 'America/New_York'

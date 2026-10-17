@@ -153,7 +153,7 @@ def test_trade_mode_can_reach_order_execution_layer(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -186,7 +186,7 @@ def test_report_mode_cannot_place_orders_and_still_updates_reporting(monkeypatch
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -218,7 +218,7 @@ def test_global_market_data_failure_places_zero_orders(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL", source="unavailable", is_fresh=False)},
+            snapshots={"AAPL": _fresh_snapshot("AAPL", source="unavailable", is_fresh=False), **_benchmarks()},
             service_available=False,
             used_fallback_data=False,
             message="service unavailable",
@@ -312,7 +312,7 @@ def test_daily_loss_circuit_breaker_resets_on_new_trading_day(monkeypatch, tmp_p
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -356,11 +356,11 @@ def test_first_three_qualifying_trades_execute_and_fourth_is_rejected(monkeypatc
 
     monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
     monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
-    monkeypatch.setattr("src.main.generate_signal", lambda snapshot, sym_cfg: signal_map[snapshot.symbol])
+    monkeypatch.setattr("src.main.generate_signal", lambda snapshot, sym_cfg, **kwargs: signal_map[snapshot.symbol])
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={str(symbol["symbol"]): _fresh_snapshot(str(symbol["symbol"])) for symbol in symbols},
+            snapshots={**{str(symbol["symbol"]): _fresh_snapshot(str(symbol["symbol"])) for symbol in symbols}, **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -395,7 +395,7 @@ def test_successful_trade_and_failed_email_still_persists_state(monkeypatch, tmp
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -432,7 +432,7 @@ def test_email_required_failure_raises_after_state_is_persisted(monkeypatch, tmp
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -466,7 +466,7 @@ def test_rerun_after_email_failure_reads_trade_log_and_blocks_duplicate_symbol(m
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -513,7 +513,7 @@ def test_scheduled_trade_runs_once_per_eastern_day_but_manual_trade_is_still_all
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -579,7 +579,7 @@ def test_scheduled_trade_runs_again_on_next_eastern_day(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -611,7 +611,7 @@ def test_scheduled_report_runs_once_per_eastern_day(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -654,7 +654,7 @@ def test_daily_pnl_uses_final_authoritative_equity(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -694,7 +694,7 @@ def test_daily_loss_circuit_breaker_uses_final_equity_value(monkeypatch, tmp_pat
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -739,7 +739,7 @@ def test_same_eastern_day_report_does_not_reset_start_of_day_equity(monkeypatch,
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -784,7 +784,7 @@ def test_new_eastern_day_resets_start_of_day_equity(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "src.main.get_market_snapshots",
         lambda *args, **kwargs: MarketDataResult(
-            snapshots={"AAPL": _fresh_snapshot("AAPL")},
+            snapshots={"AAPL": _fresh_snapshot("AAPL"), **_benchmarks()},
             service_available=True,
             used_fallback_data=False,
         ),
@@ -837,4 +837,6 @@ def test_invalid_trade_startup_configuration_raises_before_order_placement(monke
     assert client.calls == []
 
 
-
+def _benchmarks() -> dict:
+    """Fresh, flat SPY/QQQ snapshots: the market filter fails closed without them, so trade stubs include them."""
+    return {symbol: _fresh_snapshot(symbol, day_change=0.0) for symbol in ("SPY", "QQQ")}

@@ -25,7 +25,7 @@ from .risk_manager import (
     normalize_qty_for_asset,
     validate_trade_startup_config,
 )
-from .strategy import MarketSnapshot, generate_signal, predict_next_day
+from .strategy import BENCHMARK_SYMBOLS, MarketSnapshot, build_market_context, generate_signal, predict_next_day
 from .time_utils import ensure_aware, iso_to_trading_day, trading_day
 from .watchlist_manager import refresh_weekly_watchlist
 
@@ -384,12 +384,16 @@ def run_once(
     risk_manager = RiskManager(config=risk_config)
 
     # Fetch validated current prices for all symbols in one go.
+    # Benchmarks ride along for the market filter (never traded); mirrors the live bot's request.
+    watched = {item["symbol"] for item in symbols}
+    benchmark_requests = [{"symbol": symbol, "type": "etf", "benchmark": True} for symbol in BENCHMARK_SYMBOLS if symbol not in watched]
     market_data_result = get_market_snapshots(
-        symbols,
+        symbols + benchmark_requests,
         allow_fallback_data=allow_fallback_data,
         now=run_time,
     )
     snapshots = market_data_result.snapshots
+    market_context = build_market_context(snapshots)
 
     results = []
     signal_map: Dict[str, dict] = {}
@@ -401,7 +405,7 @@ def run_once(
         asset_type = sym_cfg["type"]
         snapshot = snapshots.get(sym) or MarketSnapshot(symbol=sym, last_price=0.0, day_change_percent=0.0, source="unavailable")
 
-        signal = generate_signal(snapshot, sym_cfg)
+        signal = generate_signal(snapshot, sym_cfg, market_context=market_context)
 
         dca_position_value = max_position_value
         if signal.action == "buy" and "dca buy" in signal.reason.lower():
