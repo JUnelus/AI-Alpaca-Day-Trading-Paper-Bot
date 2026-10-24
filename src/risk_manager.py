@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Optional
 
 from .time_utils import trading_day
@@ -19,6 +19,8 @@ class RiskConfig:
     allow_shorts: bool = False
     min_confidence: float = 0.70
     max_risk_percent: float = 1.0
+    # Stock/ETF BUYs may be sized in fractional shares only while account equity is below this.
+    fractional_equity_threshold: float = 20_000.0
 
     @classmethod
     def from_sources(cls, config: Optional[dict] = None) -> "RiskConfig":
@@ -36,6 +38,10 @@ class RiskConfig:
             allow_shorts=_env_bool("ALLOW_SHORTS", config.get("allow_shorts", False)),
             min_confidence=_env_float("MIN_CONFIDENCE", config.get("min_confidence", 0.70)),
             max_risk_percent=_env_float("MAX_RISK_PERCENT", config.get("max_risk_percent", 1.0)),
+            fractional_equity_threshold=_env_float(
+                "FRACTIONAL_EQUITY_THRESHOLD",
+                config.get("fractional_equity_threshold", 20_000.0),
+            ),
         )
 
 
@@ -59,6 +65,10 @@ class RiskEvaluationContext:
     daily_loss_triggered: bool
     protective_stop_supported: bool
     allow_shorts: bool = False
+    # Broker reports the asset as fractionable (always irrelevant for crypto).
+    symbol_fractionable: bool = False
+    # Sizing for this evaluation may keep fractional stock/ETF quantities.
+    allow_fractional: bool = False
 
 
 @dataclass
@@ -94,21 +104,48 @@ def _safe_float(value, default: float = 0.0) -> float:
         return default
 
 
-def normalize_qty_for_asset(asset_type: str, qty: float) -> float:
+def normalize_qty_for_asset(asset_type: str, qty: float, allow_fractional: bool = False) -> float:
     qty = max(0.0, _safe_float(qty))
     if asset_type == "crypto":
+        return math.floor(qty * 10_000) / 10_000
+    if allow_fractional:
         return math.floor(qty * 10_000) / 10_000
     return float(math.floor(qty))
 
 
-def qty_for_notional(asset_type: str, entry_price: float, notional_value: float) -> float:
+def qty_for_notional(asset_type: str, entry_price: float, notional_value: float, allow_fractional: bool = False) -> float:
     if entry_price <= 0 or notional_value <= 0:
         return 0.0
-    return normalize_qty_for_asset(asset_type, notional_value / entry_price)
+    return normalize_qty_for_asset(asset_type, notional_value / entry_price, allow_fractional=allow_fractional)
 
 
 def notional_value(entry_price: float, qty: float) -> float:
     return max(0.0, entry_price) * max(0.0, qty)
+
+
+def uses_fractional_quantity(asset_type: str, qty: float) -> bool:
+    if asset_type == "crypto":
+        return True
+    return abs(qty - math.floor(max(0.0, qty))) > 1e-9
+
+
+def allows_fractional_equity_orders(
+    account_equity: float,
+    asset_type: str,
+    symbol_fractionable: bool,
+    threshold: float,
+) -> bool:
+    """Return whether a newly sized order may use fractional quantities.
+
+    Crypto is intentionally unaffected. Equity/ETF BUY sizing only uses
+    fractions below the configured threshold and for broker-fractionable assets.
+    SELL-to-close handling supplies its own position-aware allowance.
+    """
+    if asset_type == "crypto":
+        return True
+    if asset_type not in {"stock", "etf"}:
+        return False
+    return bool(symbol_fractionable) and max(0.0, account_equity) < max(0.0, threshold)
 
 
 def validate_trade_startup_config(config: RiskConfig, paper_trading: bool) -> list[str]:
@@ -134,6 +171,8 @@ def validate_trade_startup_config(config: RiskConfig, paper_trading: bool) -> li
         errors.append("MAX_DAILY_LOSS_PERCENT must be greater than 0.")
     if config.max_risk_percent <= 0:
         errors.append("MAX_RISK_PERCENT must be greater than 0.")
+    if config.fractional_equity_threshold < 0:
+        errors.append("FRACTIONAL_EQUITY_THRESHOLD must be greater than or equal to 0.")
     if not (0 <= config.min_confidence <= 1):
         errors.append("MIN_CONFIDENCE must be between 0 and 1.")
 
@@ -148,24 +187,23 @@ class RiskManager:
     def __init__(self, config: Optional[RiskConfig] = None, min_confidence: Optional[float] = None, max_risk_percent: Optional[float] = None) -> None:
         base_config = config or RiskConfig()
         if min_confidence is not None or max_risk_percent is not None:
-            base_config = RiskConfig(
-                portfolio_size=base_config.portfolio_size,
-                max_position_percent=base_config.max_position_percent,
-                max_daily_loss_percent=base_config.max_daily_loss_percent,
-                max_daily_trades=base_config.max_daily_trades,
-                max_total_exposure_percent=base_config.max_total_exposure_percent,
-                allow_margin=base_config.allow_margin,
-                allow_shorts=base_config.allow_shorts,
-                min_confidence=base_config.min_confidence if min_confidence is None else min_confidence,
-                max_risk_percent=base_config.max_risk_percent if max_risk_percent is None else max_risk_percent,
-            )
+            overrides = {}
+            if min_confidence is not None:
+                overrides["min_confidence"] = min_confidence
+            if max_risk_percent is not None:
+                overrides["max_risk_percent"] = max_risk_percent
+            base_config = replace(base_config, **overrides)
         self.config = base_config
 
     def evaluate(self, decision: dict, context: RiskEvaluationContext) -> RiskCheckResult:
         symbol = str(decision.get("symbol", "")).upper()
         action = str(decision.get("action", "hold")).lower()
         confidence = _safe_float(decision.get("confidence", 0.0))
-        requested_qty = normalize_qty_for_asset(context.asset_type, _safe_float(decision.get("qty", 0.0)))
+        requested_qty = normalize_qty_for_asset(
+            context.asset_type,
+            _safe_float(decision.get("qty", 0.0)),
+            allow_fractional=context.allow_fractional,
+        )
         stop_loss_value = decision.get("stop_loss")
         max_risk_percent = _safe_float(decision.get("max_risk_percent", self.config.max_risk_percent), self.config.max_risk_percent)
 
@@ -242,7 +280,11 @@ class RiskManager:
             reasons.append("Rejected: no long position exists to sell.")
 
         if not context.allow_shorts and requested_qty > held_qty > 0.0:
-            adjusted_qty = normalize_qty_for_asset(context.asset_type, held_qty)
+            adjusted_qty = normalize_qty_for_asset(
+                context.asset_type,
+                held_qty,
+                allow_fractional=context.allow_fractional,
+            )
             notes.append(
                 f"Resized SELL quantity from {requested_qty:g} to {adjusted_qty:g} so the trade cannot open or increase a short position."
             )
@@ -287,6 +329,10 @@ class RiskManager:
         if not context.allow_shorts and context.current_position_qty < 0.0:
             reasons.append("Rejected: BUY against an existing short position is not supported while shorts are disabled.")
 
+        fractional_requested = uses_fractional_quantity(context.asset_type, requested_qty)
+        if fractional_requested and context.asset_type in {"stock", "etf"} and not context.symbol_fractionable:
+            reasons.append("Rejected: fractional-share execution is not supported for this asset.")
+
         if reasons:
             return RiskCheckResult(False, reasons=reasons, notes=notes, adjusted_qty=0.0, requested_qty=requested_qty)
 
@@ -301,22 +347,24 @@ class RiskManager:
         per_unit_risk = max(0.0, context.entry_price - stop_price)
         risk_base = risk_budget_base(self.config.portfolio_size, context.account_equity)
         allowed_risk = max(0.0, risk_base * (self.config.max_risk_percent / 100.0))
+        allow_fractional = context.allow_fractional
         risk_qty_limit = normalize_qty_for_asset(
             context.asset_type,
             allowed_risk / per_unit_risk if per_unit_risk > 0.0 else 0.0,
+            allow_fractional=allow_fractional,
         )
 
         qty_limits = {
-            "position": qty_for_notional(context.asset_type, context.entry_price, remaining_position_value),
-            "exposure": qty_for_notional(context.asset_type, context.entry_price, remaining_exposure_value),
-            "cash": qty_for_notional(context.asset_type, context.entry_price, actual_available_cash),
-            "portfolio": qty_for_notional(context.asset_type, context.entry_price, remaining_portfolio_capacity),
+            "position": qty_for_notional(context.asset_type, context.entry_price, remaining_position_value, allow_fractional),
+            "exposure": qty_for_notional(context.asset_type, context.entry_price, remaining_exposure_value, allow_fractional),
+            "cash": qty_for_notional(context.asset_type, context.entry_price, actual_available_cash, allow_fractional),
+            "portfolio": qty_for_notional(context.asset_type, context.entry_price, remaining_portfolio_capacity, allow_fractional),
             "risk": risk_qty_limit,
         }
         adjusted_qty = requested_qty
         for qty_limit in qty_limits.values():
             adjusted_qty = min(adjusted_qty, qty_limit)
-        adjusted_qty = normalize_qty_for_asset(context.asset_type, adjusted_qty)
+        adjusted_qty = normalize_qty_for_asset(context.asset_type, adjusted_qty, allow_fractional=allow_fractional)
 
         if adjusted_qty <= 0.0:
             if remaining_position_value <= 0.0:
