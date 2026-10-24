@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,16 +7,20 @@ import pytest
 
 from src.alpaca_client import AccountSnapshot, BrokerAsset
 from src.execution_models import ExecutionResult
-from src.main import ConfigurationError, apply_execution_to_available_cash, run_once
+from src.main import ConfigurationError, EodCleanupError, apply_execution_to_available_cash, parse_args, run_once
 from src.market_data import MarketDataResult
 from src.portfolio import PortfolioState
 from src.strategy import MarketSnapshot, StrategySignal
 
 
 class DummyAlpacaClient:
-    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True, fractionable=True):
+    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True, fractionable=True, eod_window="in_window", eod_results=None, positions_error=None):
         self.paper = paper
         self.fractionable = fractionable
+        self.eod_window = eod_window
+        self._eod_results = list(eod_results or [])
+        self.positions_error = positions_error
+        self.eod_calls = []
         self._execution_results = list(execution_results or [])
         self._positions = list(positions or [])
         self._account = account or AccountSnapshot(equity=10_000.0, cash=5_000.0, buying_power=5_000.0)
@@ -34,6 +38,45 @@ class DummyAlpacaClient:
 
     def list_positions(self):
         return list(self._positions)
+
+    def list_positions_strict(self):
+        if self.positions_error is not None:
+            raise self.positions_error
+        return list(self._positions)
+
+    def eod_cleanup_window(self):
+        messages = {
+            "in_window": None,
+            "before_window": "200 minutes remain before the close, outside the 30-minute EOD cleanup window.",
+            "closed": "The exchange is closed, so a DAY market SELL could not execute before this session's DAY stops expire.",
+            "unavailable": "Alpaca market clock could not be read: clock down",
+        }
+        return {"state": self.eod_window, "minutes_to_close": None, "message": messages[self.eod_window]}
+
+    def close_position_for_eod(self, symbol, qty, asset_type, current_position_qty):
+        if self.fail_on_place:
+            raise AssertionError("This run must never place an order.")
+        self.eod_calls.append({"symbol": symbol, "qty": qty, "asset_type": asset_type, "current_position_qty": current_position_qty})
+        if self._eod_results:
+            return self._eod_results.pop(0)
+        self._positions = [p for p in self._positions if getattr(p, "symbol", "") != symbol]
+        return ExecutionResult(
+            success=True,
+            symbol=symbol,
+            side="sell",
+            requested_qty=qty,
+            filled_qty=qty,
+            filled_avg_price=100.0,
+            entry_order_id=f"{symbol}-eod-sell",
+            counts_as_trade=True,
+            status="filled",
+            message="SELL-to-close submitted after protective stop reconciliation.",
+            asset_type=asset_type,
+            cancelled_protective_order_ids=[f"{symbol}-day-stop"],
+            actual_remaining_position_qty=0.0,
+            protection_reconciled=True,
+            eod_exit=True,
+        )
 
     def get_position_qty(self, symbol: str):
         for position in self._positions:
@@ -844,3 +887,219 @@ def test_invalid_trade_startup_configuration_raises_before_order_placement(monke
 def _benchmarks() -> dict:
     """Fresh, flat SPY/QQQ snapshots: the market filter fails closed without them, so trade stubs include them."""
     return {symbol: _fresh_snapshot(symbol, day_change=0.0) for symbol in ("SPY", "QQQ")}
+
+
+# ── end-of-day fractional cleanup ─────────────────────────────────────────────
+
+def _position(symbol, qty, side="long", price=100.0):
+    return SimpleNamespace(symbol=symbol, qty=str(qty), side=side, current_price=price, market_value=qty * price, avg_entry_price=price, cost_basis=qty * price, unrealized_pl=0.0, unrealized_plpc=0.0)
+
+
+_EOD_SYMBOLS = [
+    {"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9},
+    {"symbol": "MSFT", "name": "Microsoft", "type": "stock", "quality_score": 0.9},
+    {"symbol": "BTC/USD", "name": "Bitcoin", "type": "crypto", "quality_score": 0.9},
+]
+_EOD_NOW = datetime(2026, 8, 27, 19, 40, tzinfo=timezone.utc)  # 15:40 New York
+
+
+def _eod_positions():
+    return [_position("AAPL", 0.0288), _position("MSFT", 1.0), _position("BTC/USD", 0.01), _position("SPY", 0.5, side="short")]
+
+
+def _run_eod(alpaca, paths, scheduled_run=True, now=_EOD_NOW):
+    watchlist_path, log_path, summary_path, readme_path, state_path = paths
+    return run_once(
+        mode="eod",
+        scheduled_run=scheduled_run,
+        watchlist_path=str(watchlist_path),
+        log_path=str(log_path),
+        summary_path=str(summary_path),
+        readme_path=str(readme_path),
+        state_path=str(state_path),
+        now=now,
+        alpaca_client=alpaca,
+    )
+
+
+def test_eod_mode_sells_only_long_fractional_equity_positions(monkeypatch, tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    watchlist_path, log_path, summary_path, readme_path, state_path = paths
+    alpaca = DummyAlpacaClient(positions=_eod_positions())
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("eod mode must not email")))
+
+    result = _run_eod(alpaca, paths)
+
+    assert result["mode"] == "eod"
+    assert [call["symbol"] for call in alpaca.eod_calls] == ["AAPL"]
+    assert alpaca.eod_calls[0] == {"symbol": "AAPL", "qty": 0.0288, "asset_type": "stock", "current_position_qty": 0.0288}
+    assert alpaca.calls == []  # never routed through the strategy order path
+    assert result["results"][0]["order_result"]["eod_exit"]
+    assert result["email_sent"] is False
+
+    state = PortfolioState.load(str(state_path))
+    assert state.mode == "eod"
+    assert state.last_scheduled_eod_day == "2026-08-27"
+    assert state.eod_cleanup_warnings == []
+    assert state.trades_today == 1
+    assert state.traded_symbols_today == ["AAPL"]
+    assert [p.symbol for p in state.positions] == ["MSFT", "BTC/USD", "SPY"]
+
+    log_rows = log_path.read_text(encoding="utf-8").strip().splitlines()
+    assert len(log_rows) == 1
+    assert ",AAPL,sell," in log_rows[0]
+    assert "AAPL-eod-sell" in log_rows[0]
+    summary = summary_path.read_text(encoding="utf-8")
+    assert "Run mode: `eod`" in summary
+    assert "EOD Cleanup Exits" in summary
+    assert "**AAPL** — SELL" in summary and "✅ EXECUTED" in summary
+    assert "**AAPL** | SELL" in readme_path.read_text(encoding="utf-8")
+
+
+def test_eod_mode_with_nothing_fractional_is_a_clean_run(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(positions=[_position("MSFT", 2.0), _position("BTC/USD", 0.5)])
+
+    result = _run_eod(alpaca, paths)
+
+    assert result["results"] == []
+    assert alpaca.eod_calls == []
+    assert "No fractional stock/ETF positions needed an end-of-day exit." in paths[2].read_text(encoding="utf-8")
+    assert PortfolioState.load(str(paths[4])).last_scheduled_eod_day == "2026-08-27"
+
+
+def test_eod_mode_before_window_is_a_noop_that_leaves_no_marker(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(positions=_eod_positions(), eod_window="before_window")
+
+    result = _run_eod(alpaca, paths)
+
+    assert result["scheduled_marker_skipped"]
+    assert "outside the 30-minute EOD cleanup window" in result["reason"]
+    assert alpaca.eod_calls == []
+    assert not paths[4].exists()  # nothing persisted, so the in-window run later today still acts
+
+
+@pytest.mark.parametrize("window", ["closed", "unavailable"])
+def test_eod_mode_refuses_to_sell_when_the_session_is_closed_or_the_clock_is_unusable(tmp_path, window):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(positions=_eod_positions(), eod_window=window, fail_on_place=True)
+
+    with pytest.raises(EodCleanupError, match="unresolved"):
+        _run_eod(alpaca, paths)
+
+    state = PortfolioState.load(str(paths[4]))
+    assert state.last_scheduled_eod_day == "2026-08-27"
+    assert len(state.eod_cleanup_warnings) == 1
+    assert "EOD cleanup failed for AAPL" in state.eod_cleanup_warnings[0]
+    assert state.eod_cleanup_warnings[0] in state.warnings
+    log_rows = paths[1].read_text(encoding="utf-8").strip().splitlines()
+    assert len(log_rows) == 1 and "eod_exit_blocked" in log_rows[0]
+
+
+def test_eod_mode_without_fractional_positions_tolerates_a_closed_session(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(positions=[_position("MSFT", 2.0)], eod_window="closed")
+
+    result = _run_eod(alpaca, paths)
+
+    assert result["results"] == []
+    assert PortfolioState.load(str(paths[4])).eod_cleanup_warnings == []
+
+
+def test_eod_mode_exit_failure_raises_after_persisting_state_and_log(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    failure = ExecutionResult(
+        success=False, symbol="AAPL", side="sell", requested_qty=0.0288, status="critical_unprotected_position",
+        message="CRITICAL: EOD SELL for AAPL did not reach a terminal state after cancellation.", asset_type="stock", protection_failed=True, eod_exit=True,
+    )
+    alpaca = DummyAlpacaClient(positions=_eod_positions(), eod_results=[failure])
+
+    with pytest.raises(EodCleanupError, match="AAPL"):
+        _run_eod(alpaca, paths)
+
+    state = PortfolioState.load(str(paths[4]))
+    assert state.mode == "eod"
+    assert any("did not reach a terminal state" in w for w in state.warnings)
+    assert "critical_unprotected_position" in paths[1].read_text(encoding="utf-8")
+    assert "⚠️ PROTECTION FAILED" in paths[2].read_text(encoding="utf-8")
+
+
+def test_eod_mode_position_listing_failure_raises_instead_of_reading_flat(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(positions=_eod_positions(), positions_error=RuntimeError("positions endpoint down"))
+
+    with pytest.raises(RuntimeError, match="positions endpoint down"):
+        _run_eod(alpaca, paths)
+
+    assert alpaca.eod_calls == []
+
+
+def test_eod_mode_requires_a_ready_paper_client(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(positions=_eod_positions())
+    alpaca.is_ready = False
+
+    with pytest.raises(EodCleanupError, match="credentials"):
+        _run_eod(alpaca, paths)
+    assert alpaca.eod_calls == []
+
+    with pytest.raises(ConfigurationError):
+        _run_eod(DummyAlpacaClient(positions=_eod_positions(), paper=False), paths)
+
+
+def test_scheduled_eod_runs_once_per_eastern_day_but_manual_rerun_is_allowed(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    first = DummyAlpacaClient(positions=_eod_positions())
+    _run_eod(first, paths)
+    assert len(first.eod_calls) == 1
+
+    second = DummyAlpacaClient(positions=_eod_positions())
+    rerun = _run_eod(second, paths, now=_EOD_NOW + timedelta(minutes=5))
+    assert rerun["scheduled_marker_skipped"]
+    assert second.eod_calls == []
+
+    manual = DummyAlpacaClient(positions=_eod_positions())
+    _run_eod(manual, paths, scheduled_run=False, now=_EOD_NOW + timedelta(minutes=6))
+    assert len(manual.eod_calls) == 1
+
+    next_day = DummyAlpacaClient(positions=_eod_positions())
+    _run_eod(next_day, paths, now=_EOD_NOW + timedelta(days=1))
+    assert len(next_day.eod_calls) == 1
+
+
+def test_eod_cleanup_warnings_surface_on_same_day_report_and_expire_next_day(monkeypatch, tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    watchlist_path, log_path, summary_path, readme_path, state_path = paths
+    alpaca = DummyAlpacaClient(positions=_eod_positions(), eod_window="closed")
+    with pytest.raises(EodCleanupError):
+        _run_eod(alpaca, paths)
+
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        "src.main.get_market_snapshots",
+        lambda *args, **kwargs: MarketDataResult(snapshots={**{s["symbol"]: _fresh_snapshot(s["symbol"]) for s in _EOD_SYMBOLS}, **_benchmarks()}, service_available=True, used_fallback_data=False),
+    )
+
+    def report(now):
+        return run_once(
+            mode="report", scheduled_run=True, watchlist_path=str(watchlist_path), log_path=str(log_path), summary_path=str(summary_path),
+            readme_path=str(readme_path), state_path=str(state_path), now=now, alpaca_client=DummyAlpacaClient(positions=_eod_positions(), fail_on_place=True),
+        )
+
+    same_day = report(_EOD_NOW + timedelta(minutes=35))
+    assert any("EOD cleanup failed for AAPL" in w for w in same_day["portfolio"]["warnings"])
+    assert PortfolioState.load(str(state_path)).last_scheduled_eod_day == "2026-08-27"
+
+    next_day = report(_EOD_NOW + timedelta(days=1))
+    assert not any("EOD cleanup failed" in w for w in next_day["portfolio"]["warnings"])
+    assert PortfolioState.load(str(state_path)).eod_cleanup_warnings == []
+
+
+def test_parse_args_accepts_eod_mode():
+    args = parse_args(["--mode", "eod", "--scheduled-run"])
+    assert args.mode == "eod"
+    assert args.scheduled_run
+    with pytest.raises(SystemExit):
+        parse_args(["--mode", "cleanup"])

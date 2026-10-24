@@ -62,6 +62,9 @@ class PortfolioState:
     mode: str = "report"
     last_scheduled_trade_day: str = ""
     last_scheduled_report_day: str = ""
+    last_scheduled_eod_day: str = ""
+    # Failures from the latest end-of-day fractional cleanup, carried through the same trading day.
+    eod_cleanup_warnings: List[str] = field(default_factory=list)
     pnl_data_complete: bool = True
     unknown_position_pnl_count: int = 0
 

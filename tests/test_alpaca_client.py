@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -13,10 +14,21 @@ _requires_alpaca_sdk = pytest.mark.skipif(
 )
 
 
+_CLOCK_NOW = datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc)
+
+
+def _clock(is_open=True, minutes_to_close=120.0, now=_CLOCK_NOW):
+    return SimpleNamespace(is_open=is_open, timestamp=now, next_close=now + timedelta(minutes=minutes_to_close))
+
+
 class RecordingTradingClient:
-    def __init__(self, responses=None, open_orders=None, cancel_fail_ids=None, order_sequences=None, positions=None, fractionable=True):
+    def __init__(self, responses=None, open_orders=None, cancel_fail_ids=None, order_sequences=None, positions=None, fractionable=True, clock=None, clock_error=None, on_submit=None):
         self.responses = list(responses or [])
         self.fractionable = fractionable
+        # Default: an open market with ample time before the close, so fractional entries are not cut off.
+        self.clock = clock if clock is not None else _clock()
+        self.clock_error = clock_error
+        self.on_submit = on_submit
         self.orders = []
         self.lookup = {}
         self.open_orders = []
@@ -28,11 +40,18 @@ class RecordingTradingClient:
         for order in open_orders or []:
             self._register(order, include_in_open=True)
 
+    def get_clock(self):
+        if self.clock_error is not None:
+            raise self.clock_error
+        return self.clock
+
     def submit_order(self, order):
         self.orders.append(order)
         response = self.responses.pop(0)
         if isinstance(response, Exception):
             raise response
+        if self.on_submit is not None:
+            self.on_submit(order, response)
 
         if getattr(response, "symbol", None) is None:
             response.symbol = getattr(order, "symbol", None)
@@ -942,3 +961,193 @@ def test_partial_sell_of_fractional_position_replaces_protection_with_day_stop()
     assert client.orders[0].time_in_force.value == "day"
     assert client.orders[1].qty == 0.02
     assert client.orders[1].time_in_force.value == "day"
+
+
+# ── fractional entry cutoff and end-of-day cleanup ────────────────────────────
+
+def test_fractional_buy_is_blocked_inside_the_eod_window():
+    client = RecordingTradingClient([], clock=_clock(minutes_to_close=20))
+    alpaca = _alpaca(client, paper=True, fractional_eod_window_minutes=30)
+
+    result = _fractional_buy(alpaca)
+
+    assert not result.success
+    assert result.status == "fractional_entry_after_eod_cutoff"
+    assert "20 minutes remain" in result.message
+    assert client.orders == []
+
+
+def test_fractional_buy_is_blocked_when_market_closed_or_clock_unusable():
+    closed = _alpaca(RecordingTradingClient([], clock=_clock(is_open=False)), paper=True)
+    broken = _alpaca(RecordingTradingClient([], clock_error=RuntimeError("clock down")), paper=True)
+    naive = _alpaca(RecordingTradingClient([], clock=SimpleNamespace(is_open=True, timestamp=datetime(2026, 8, 27, 14, 0), next_close=datetime(2026, 8, 27, 20, 0))), paper=True)
+    no_clock_client = RecordingTradingClient([])
+    del no_clock_client.clock
+    no_clock_client.get_clock = None
+    no_clock = _alpaca(no_clock_client, paper=True)
+    no_clock._client = SimpleNamespace(get_asset=no_clock_client.get_asset)
+
+    for alpaca in (closed, broken, naive, no_clock):
+        result = _fractional_buy(alpaca)
+        assert not result.success
+        assert result.status == "fractional_entry_after_eod_cutoff"
+        assert alpaca._client is no_clock._client or alpaca._client.orders == []
+
+
+@_requires_alpaca_sdk
+def test_whole_share_buy_is_not_subject_to_the_eod_window():
+    stop_leg = _order(id="stop-1", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=1.0)
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="accepted", filled_qty=1.0, filled_avg_price=347.0, order_class="oto", legs=[stop_leg])
+    client = RecordingTradingClient([entry], clock=_clock(minutes_to_close=5))
+    alpaca = _alpaca(client, paper=True)
+
+    result = _fractional_buy(alpaca, qty=1.0)
+
+    assert result.success
+    assert client.orders[0].time_in_force.value == "gtc"
+
+
+def test_eod_cleanup_window_classification_uses_only_the_broker_clock(monkeypatch):
+    monkeypatch.setenv("FRACTIONAL_EOD_WINDOW_MINUTES", "45")
+    assert _alpaca(RecordingTradingClient([], clock=_clock(minutes_to_close=46)), paper=True).eod_cleanup_window()["state"] == "before_window"
+    assert _alpaca(RecordingTradingClient([], clock=_clock(minutes_to_close=45)), paper=True).eod_cleanup_window()["state"] == "in_window"
+    assert _alpaca(RecordingTradingClient([], clock=_clock(is_open=False)), paper=True).eod_cleanup_window()["state"] == "closed"
+    assert _alpaca(RecordingTradingClient([], clock=_clock(minutes_to_close=-1)), paper=True).eod_cleanup_window()["state"] == "closed"
+    assert _alpaca(RecordingTradingClient([], clock_error=RuntimeError("down")), paper=True).eod_cleanup_window()["state"] == "unavailable"
+    assert _alpaca(RecordingTradingClient([], clock=SimpleNamespace(is_open="yes", timestamp=_CLOCK_NOW, next_close=_CLOCK_NOW)), paper=True).eod_cleanup_window()["state"] == "unavailable"
+    # Explicit constructor values win over the environment and are floored at one minute.
+    assert _alpaca(RecordingTradingClient([]), paper=True, fractional_eod_window_minutes=0).fractional_eod_window_minutes == 1
+
+
+def test_list_positions_strict_raises_instead_of_reading_as_flat():
+    class BrokenPositions(RecordingTradingClient):
+        def get_all_positions(self):
+            raise RuntimeError("positions endpoint down")
+
+    alpaca = _alpaca(BrokenPositions([]), paper=True)
+    assert alpaca.list_positions() == []
+    with pytest.raises(RuntimeError):
+        alpaca.list_positions_strict()
+    with pytest.raises(RuntimeError):
+        AlpacaClient(trading_client=None, paper=True).list_positions_strict()
+
+
+def test_close_position_for_eod_rejects_unsafe_inputs_without_touching_the_broker():
+    client = RecordingTradingClient([], positions=[_order(symbol="AAPL", qty="0.03", side="long")])
+    alpaca = _alpaca(client, paper=True)
+
+    assert alpaca.close_position_for_eod("BTC/USD", 0.01, "crypto", 0.01).status == "rejected_not_equity"
+    assert alpaca.close_position_for_eod("AAPL", 0.05, "stock", 0.03).status == "rejected_invalid_qty"
+    assert alpaca.close_position_for_eod("AAPL", 0.0, "stock", 0.03).status == "rejected_invalid_qty"
+    assert _alpaca(RecordingTradingClient([]), paper=False).close_position_for_eod("AAPL", 0.03, "stock", 0.03).status == "rejected_live_disabled"
+    assert AlpacaClient(trading_client=None, paper=True).close_position_for_eod("AAPL", 0.03, "stock", 0.03).status == "skipped"
+    assert client.orders == []
+    assert client.cancelled_ids == []
+
+
+@_requires_alpaca_sdk
+def test_close_position_for_eod_cancels_day_stop_then_confirms_full_exit():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.0288, stop_price=340.0, status="new", time_in_force="day")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.0288, filled_qty=0.0288, filled_avg_price=350.0, status="filled", order_class=None, legs=[])
+    client = RecordingTradingClient(
+        responses=[sell_order],
+        open_orders=[day_stop],
+        positions=[_order(symbol="AAPL", qty="0.0288", side="long")],
+        on_submit=lambda order, response: client.positions.clear(),
+    )
+    alpaca = _alpaca(client, paper=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0288, "stock", current_position_qty=0.0288)
+
+    assert result.success, result.message
+    assert result.eod_exit
+    assert result.counts_as_trade
+    assert result.filled_qty == 0.0288
+    assert result.cancelled_protective_order_ids == ["stop-day"]
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+    assert client.orders[0].side.value == "sell"
+    assert client.orders[0].time_in_force.value == "day"
+    assert result.actual_remaining_position_qty == 0.0
+    assert result.protection_reconciled
+
+
+@_requires_alpaca_sdk
+def test_close_position_for_eod_unfilled_sell_is_cancelled_before_protection_is_restored():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="accepted", order_class=None, legs=[])
+    restored_stop = _order(id="stop-restored", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    client = RecordingTradingClient(
+        responses=[sell_order, restored_stop],
+        open_orders=[day_stop],
+        positions=[_order(symbol="AAPL", qty="0.03", side="long")],
+        order_sequences={
+            "sell-1": [
+                _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="accepted"),
+                _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="accepted"),
+                _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="pending_cancel"),
+                _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="canceled"),
+            ]
+        },
+    )
+    alpaca = _alpaca(client, paper=True, exit_fill_poll_attempts=2)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.03, "stock", current_position_qty=0.03)
+
+    assert not result.success
+    assert result.status == "sell_failed_protection_restored"
+    assert client.cancelled_ids == ["stop-day", "sell-1"]  # the SELL is cancelled and confirmed before any stop returns
+    assert result.exit_poll_attempts >= 3
+    assert result.protection_active
+    assert result.protection_restored
+    assert result.restored_protective_order_id == "stop-restored"
+    assert client.orders[1].time_in_force.value == "day"
+    assert client.orders[1].qty == 0.03
+
+
+@_requires_alpaca_sdk
+def test_close_position_for_eod_ambiguous_sell_state_fails_closed_without_stacking_a_stop():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="accepted", order_class=None, legs=[])
+    client = RecordingTradingClient(
+        responses=[sell_order],
+        open_orders=[day_stop],
+        positions=[_order(symbol="AAPL", qty="0.03", side="long")],
+        order_sequences={"sell-1": [_order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.0, status="accepted")]},
+    )
+    alpaca = _alpaca(client, paper=True, exit_fill_poll_attempts=1, cancel_poll_attempts=2)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.03, "stock", current_position_qty=0.03)
+
+    assert not result.success
+    assert result.status == "critical_unprotected_position"
+    assert result.protection_failed
+    assert "did not reach a terminal state" in result.message
+    assert len(client.orders) == 1  # no replacement stop while the SELL may still execute
+    assert "sell-1" in client.cancelled_ids
+
+
+@_requires_alpaca_sdk
+def test_close_position_for_eod_partial_fill_is_reported_as_incomplete_even_when_re_protected():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.01, filled_avg_price=350.0, status="canceled", order_class=None, legs=[])
+    replacement_stop = _order(id="stop-new", symbol="AAPL", side="sell", qty=0.02, stop_price=340.0, status="new", time_in_force="day")
+    positions = [_order(symbol="AAPL", qty="0.03", side="long")]
+
+    def on_submit(order, response):
+        if getattr(response, "id", None) == "sell-1":
+            positions[0].qty = "0.02"
+
+    client = RecordingTradingClient(responses=[sell_order, replacement_stop], open_orders=[day_stop], positions=positions, on_submit=on_submit)
+    alpaca = _alpaca(client, paper=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.03, "stock", current_position_qty=0.03)
+
+    assert not result.success
+    assert result.status == "eod_exit_incomplete"
+    assert result.counts_as_trade
+    assert result.filled_qty == 0.01
+    assert result.actual_remaining_position_qty == 0.02
+    assert result.protection_active
+    assert result.replacement_protective_order_id == "stop-new"
+    assert "expires at the close" in result.message

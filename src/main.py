@@ -220,6 +220,8 @@ def _build_safety_warnings(
             f"Broker position P&L is partial because cost basis or unrealized P&L is unavailable for {state.unknown_position_pnl_count} position(s)."
         )
 
+    warnings.extend(state.eod_cleanup_warnings)
+
     deduped: list[str] = []
     for warning in warnings:
         if warning not in deduped:
@@ -231,8 +233,34 @@ class ConfigurationError(RuntimeError):
     pass
 
 
+class EodCleanupError(RuntimeError):
+    """Raised after state is persisted when the EOD cleanup left a fractional position unresolved."""
+
+
+_SCHEDULED_MARKER_FIELDS = {
+    "trade": "last_scheduled_trade_day",
+    "report": "last_scheduled_report_day",
+    "eod": "last_scheduled_eod_day",
+}
+
+
 def _scheduled_marker_field(mode: str) -> str:
-    return "last_scheduled_trade_day" if mode == "trade" else "last_scheduled_report_day"
+    return _SCHEDULED_MARKER_FIELDS[mode]
+
+
+def _carry_over_persisted_state(state: PortfolioState, previous_state: PortfolioState, trading_day_value: str) -> None:
+    previous_day = _current_state_day(previous_state)
+    if previous_day is not None and previous_day < trading_day_value:
+        state.yesterday_total_pnl = previous_state.total_pnl
+        state.yesterday_equity = previous_state.account_equity
+    else:
+        state.yesterday_total_pnl = previous_state.yesterday_total_pnl
+        state.yesterday_equity = previous_state.yesterday_equity
+    state.last_scheduled_trade_day = previous_state.last_scheduled_trade_day
+    state.last_scheduled_report_day = previous_state.last_scheduled_report_day
+    state.last_scheduled_eod_day = previous_state.last_scheduled_eod_day
+    # EOD cleanup failures stay visible on the same day's later runs (the 16:15 report) and expire with the day.
+    state.eod_cleanup_warnings = list(previous_state.eod_cleanup_warnings) if previous_day == trading_day_value else []
 
 
 def _scheduled_run_already_completed(state: PortfolioState, mode: str, trading_day_value: str) -> bool:
@@ -275,8 +303,10 @@ def _build_summary_lines(state: PortfolioState, results: list[dict], trading_day
 
     lines += [
         "",
-        "## 🤖 AI Decisions",
+        "## 🧹 EOD Cleanup Exits" if mode == "eod" else "## 🤖 AI Decisions",
     ]
+    if mode == "eod" and not results:
+        lines.append("- No fractional stock/ETF positions needed an end-of-day exit.")
     for result in results:
         order_result = result.get("order_result") or {}
         if order_result.get("protection_failed"):
@@ -332,6 +362,203 @@ def _build_noop_result(mode: str, reason: str, previous_state: PortfolioState) -
     }
 
 
+# ── end-of-day fractional cleanup ─────────────────────────────────────────────
+
+def _enum_value(value) -> Optional[str]:
+    if value is None:
+        return None
+    raw = getattr(value, "value", value)
+    return str(raw).lower()
+
+
+def _fractional_equity_positions(positions: list, symbol_type_map: Dict[str, str]) -> list[dict]:
+    """Long stock/ETF holdings with a fractional quantity; their DAY stops expire at the close."""
+    candidates: list[dict] = []
+    for pos in positions:
+        sym = _normalize_sym(str(getattr(pos, "symbol", "") or ""))
+        if not sym:
+            continue
+        asset_type = symbol_type_map.get(sym, "crypto" if "/" in sym else "stock")
+        if asset_type not in {"stock", "etf"}:
+            continue
+        side = _enum_value(getattr(pos, "side", None)) or "long"
+        qty = _safe_float(getattr(pos, "qty", 0.0))
+        if side != "long" or qty <= 0 or not uses_fractional_quantity(asset_type, qty):
+            continue
+        candidates.append(
+            {
+                "symbol": sym,
+                "asset_type": asset_type,
+                "qty": qty,
+                "price": _safe_float(getattr(pos, "current_price", 0.0)),
+            }
+        )
+    return candidates
+
+
+def run_eod_cleanup(
+    scheduled_run: bool = False,
+    watchlist_path: str = WATCHLIST_PATH,
+    log_path: str = LOG_PATH,
+    summary_path: str = SUMMARY_PATH,
+    readme_path: str = README_PATH,
+    state_path: str = STATE_FILE,
+    now: Optional[datetime] = None,
+    alpaca_client: Optional[object] = None,
+) -> dict:
+    """Exit every fractional stock/ETF position before its DAY protective stop expires at the close.
+
+    Alpaca only accepts fractional equity orders as DAY orders, so the stop that protects a
+    fractional entry disappears at the close. This run, scheduled inside the pre-close window,
+    cancels that stop and market-sells the position so nothing fractional is held overnight
+    unprotected. Every path fails closed: an unreadable clock, a closed session, an unverifiable
+    position list or an exit that cannot be confirmed leaves state persisted and raises so the
+    scheduled job fails visibly.
+    """
+    mode = "eod"
+    run_time = ensure_aware(now or datetime.now(timezone.utc))
+    trading_day_value = trading_day(run_time)
+    previous_state = PortfolioState.load(state_path)
+
+    config = _load_watchlist(watchlist_path)
+    symbols: list[dict] = config["symbols"]
+    risk_config = RiskConfig.from_sources(config)
+
+    alpaca = alpaca_client or AlpacaClient()
+    startup_errors = validate_trade_startup_config(risk_config, alpaca.paper)
+    if startup_errors:
+        raise ConfigurationError("Unsafe EOD cleanup configuration: " + " ; ".join(startup_errors))
+
+    if scheduled_run and _scheduled_run_already_completed(previous_state, mode, trading_day_value):
+        return _build_noop_result(
+            mode,
+            f"Scheduled {mode} run skipped because it already completed for trading day {trading_day_value}.",
+            previous_state,
+        )
+
+    if not alpaca.is_ready:
+        raise EodCleanupError(
+            "EOD cleanup requires Alpaca paper credentials: without a broker client, fractional DAY stops cannot be verified or exited."
+        )
+
+    window = alpaca.eod_cleanup_window()
+    if window["state"] == "before_window":
+        # Too early to act (a normal-close day seen by the early-close schedule); the later run covers it,
+        # so no once-per-day marker is written.
+        reason = f"EOD cleanup skipped: {window['message']}"
+        print(reason)
+        return _build_noop_result(mode, reason, previous_state)
+
+    # A listing failure must not read as "flat": it raises and fails the job instead.
+    positions = alpaca.list_positions_strict()
+    symbol_type_map = {s["symbol"]: s["type"] for s in symbols}
+    candidates = _fractional_equity_positions(positions, symbol_type_map)
+    blocked_reason = None if window["state"] == "in_window" else window["message"]
+
+    results: list[dict] = []
+    failures: list[str] = []
+    for candidate in candidates:
+        sym = candidate["symbol"]
+        qty = candidate["qty"]
+        decision = {
+            "symbol": sym,
+            "action": "sell",
+            "confidence": 1.0,
+            "qty": qty,
+            "requested_qty": qty,
+            "stop_loss": None,
+            "max_risk_percent": None,
+            "reason": "EOD cleanup: fractional stock/ETF position whose DAY protective stop expires at the close.",
+        }
+        notes = [f"EOD cleanup window: {window['state']}"]
+        if blocked_reason:
+            order_result = ExecutionResult(
+                success=False,
+                symbol=sym,
+                side="sell",
+                requested_qty=qty,
+                status="eod_exit_blocked",
+                message=f"EOD cleanup could not exit {sym}: {blocked_reason}",
+                asset_type=candidate["asset_type"],
+                remaining_position_qty=qty,
+                eod_exit=True,
+            )
+        else:
+            order_result = alpaca.close_position_for_eod(
+                symbol=sym,
+                qty=qty,
+                asset_type=candidate["asset_type"],
+                current_position_qty=qty,
+            )
+        log_ai_decision(log_path, decision, True, [], notes, order_result, now=run_time)
+        if not order_result.success:
+            failures.append(f"EOD cleanup failed for {sym}: {order_result.message}")
+            print(failures[-1])
+        results.append(
+            {
+                "symbol": sym,
+                "decision": decision,
+                "risk": {"approved": True, "reasons": [], "notes": notes, "adjusted_qty": qty, "requested_qty": qty},
+                "order_result": order_result.to_dict(),
+                "market_data": {"source": "alpaca-position", "timestamp": run_time.isoformat(), "is_fresh": True, "is_fallback": False},
+            }
+        )
+
+    # ── portfolio state ────────────────────────────────────────────────────────
+    account = alpaca.get_account_snapshot()
+    trades_today_count, traded_today = load_trade_activity(log_path, trading_day_value)
+    start_of_day_equity, _, _, _ = _build_daily_loss_state(previous_state, account.equity, trading_day_value, risk_config)
+    state = refresh_from_alpaca(
+        alpaca,
+        symbol_type_map,
+        {},
+        starting_balance=risk_config.portfolio_size,
+        trades_today=trades_today_count,
+        account_snapshot=account,
+    )
+    _carry_over_persisted_state(state, previous_state, trading_day_value)
+    state.trading_day = trading_day_value
+    state.traded_symbols_today = sorted(traded_today)
+    state.max_total_exposure = risk_config.portfolio_size * (risk_config.max_total_exposure_percent / 100.0)
+    state.mode = mode
+    if scheduled_run:
+        setattr(state, _scheduled_marker_field(mode), trading_day_value)
+    _apply_final_daily_metrics(state, start_of_day_equity, risk_config)
+    state.eod_cleanup_warnings = list(failures)
+    state.warnings = _build_safety_warnings(
+        state,
+        risk_config,
+        MarketDataResult(snapshots={}, service_available=True),
+        mode,
+    )
+
+    _persist_run_outputs(
+        state=state,
+        symbols=symbols,
+        signal_map={},
+        results=results,
+        trading_day_value=trading_day_value,
+        mode=mode,
+        state_path=state_path,
+        summary_path=summary_path,
+        readme_path=readme_path,
+    )
+
+    if failures:
+        raise EodCleanupError(
+            "EOD cleanup left fractional position(s) unresolved after persisting state: " + " ; ".join(failures)
+        )
+
+    return {
+        "mode": mode,
+        "results": results,
+        "portfolio": asdict(state),
+        "eod_window": window,
+        "market_data": {"service_available": True, "used_fallback_data": False, "message": None},
+        "email_sent": False,
+    }
+
+
 # ── main ───────────────────────────────────────────────────────────────────────
 
 def run_once(
@@ -347,8 +574,19 @@ def run_once(
     alpaca_client: Optional[object] = None,
 ) -> dict:
     load_dotenv()
+    if mode == "eod":
+        return run_eod_cleanup(
+            scheduled_run=scheduled_run,
+            watchlist_path=watchlist_path,
+            log_path=log_path,
+            summary_path=summary_path,
+            readme_path=readme_path,
+            state_path=state_path,
+            now=now,
+            alpaca_client=alpaca_client,
+        )
     if mode not in {"trade", "report"}:
-        raise ValueError("mode must be 'trade' or 'report'.")
+        raise ValueError("mode must be 'trade', 'report' or 'eod'.")
 
     run_time = ensure_aware(now or datetime.now(timezone.utc))
     trading_day_value = trading_day(run_time)
@@ -547,20 +785,11 @@ def run_once(
         state.gross_exposure = current_gross_exposure
         state.last_updated = run_time.isoformat()
 
-    previous_day = _current_state_day(previous_state)
-    if previous_day is not None and previous_day < trading_day_value:
-        state.yesterday_total_pnl = previous_state.total_pnl
-        state.yesterday_equity = previous_state.account_equity
-    else:
-        state.yesterday_total_pnl = previous_state.yesterday_total_pnl
-        state.yesterday_equity = previous_state.yesterday_equity
-
+    _carry_over_persisted_state(state, previous_state, trading_day_value)
     state.trading_day = trading_day_value
     state.traded_symbols_today = sorted(traded_today)
     state.max_total_exposure = risk_config.portfolio_size * (risk_config.max_total_exposure_percent / 100.0)
     state.mode = mode
-    state.last_scheduled_trade_day = previous_state.last_scheduled_trade_day
-    state.last_scheduled_report_day = previous_state.last_scheduled_report_day
     if scheduled_run:
         setattr(state, _scheduled_marker_field(mode), trading_day_value)
     _apply_final_daily_metrics(state, start_of_day_equity, risk_config)
@@ -671,9 +900,12 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the Alpaca paper-trading bot in a safe explicit mode.")
     parser.add_argument(
         "--mode",
-        choices=("trade", "report"),
+        choices=("trade", "report", "eod"),
         default="report",
-        help="trade places broker orders; report updates portfolio/reporting only.",
+        help=(
+            "trade places broker orders; report updates portfolio/reporting only; "
+            "eod market-sells fractional stock/ETF positions before their DAY stops expire at the close."
+        ),
     )
     parser.add_argument(
         "--allow-fallback-data",

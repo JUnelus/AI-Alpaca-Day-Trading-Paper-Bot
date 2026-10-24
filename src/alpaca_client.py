@@ -4,6 +4,7 @@ import math
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Optional
 
 from .execution_models import ExecutionResult
@@ -15,6 +16,10 @@ _EQUITY_ASSET_TYPES = {"stock", "etf"}
 _FRACTIONAL_ENTRY_ACTIVE_STATUSES = {"accepted", "new", "pending_new", "partially_filled", "held", "open"}
 _FRACTIONAL_ENTRY_CANCEL_PENDING_STATUSES = {"pending_cancel"}
 _FRACTIONAL_ENTRY_NO_FILL_TERMINAL_STATUSES = {"canceled", "cancelled", "rejected", "expired"}
+_EXIT_TERMINAL_STATUSES = {"filled", "canceled", "cancelled", "rejected", "expired"}
+# Minutes before the exchange close in which the EOD cleanup acts and new fractional entries are
+# refused: an entry accepted inside it has no later cleanup run, so its DAY stop would expire naked.
+DEFAULT_FRACTIONAL_EOD_WINDOW_MINUTES = 30
 
 try:
     from alpaca.trading.client import TradingClient
@@ -53,6 +58,39 @@ class BrokerAsset:
     fractionable: bool = False
 
 
+@dataclass
+class MarketClock:
+    is_open: bool
+    timestamp: datetime
+    next_close: datetime
+
+    @property
+    def minutes_to_close(self) -> float:
+        return (self.next_close - self.timestamp).total_seconds() / 60.0
+
+
+def _clock_datetime(value: object) -> Optional[datetime]:
+    """Accept only an unambiguous timezone-aware broker clock instant."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return value
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(float(raw))
+    except (TypeError, ValueError):
+        return default
+
+
 class AlpacaClient:
     def __init__(
         self,
@@ -65,6 +103,8 @@ class AlpacaClient:
         protection_retries: int = 3,
         poll_delay_seconds: float = 0.5,
         entry_fill_poll_attempts: int = 3,
+        exit_fill_poll_attempts: int = 3,
+        fractional_eod_window_minutes: Optional[int] = None,
     ) -> None:
         api_key = os.getenv("ALPACA_API_KEY")
         secret_key = os.getenv("ALPACA_SECRET_KEY")
@@ -76,6 +116,11 @@ class AlpacaClient:
         self.stop_confirmation_poll_attempts = max(1, int(stop_confirmation_poll_attempts))
         # Bounded fill window for a fractional DAY entry before any unfilled remainder is cancelled.
         self.entry_fill_poll_attempts = max(1, int(entry_fill_poll_attempts))
+        # Bounded fill window for an EOD market SELL before it is cancelled and its terminal state confirmed.
+        self.exit_fill_poll_attempts = max(1, int(exit_fill_poll_attempts))
+        if fractional_eod_window_minutes is None:
+            fractional_eod_window_minutes = _env_int("FRACTIONAL_EOD_WINDOW_MINUTES", DEFAULT_FRACTIONAL_EOD_WINDOW_MINUTES)
+        self.fractional_eod_window_minutes = max(1, int(fractional_eod_window_minutes))
         self.protection_retries = max(1, int(protection_retries))
         self.poll_delay_seconds = max(0.0, float(poll_delay_seconds))
 
@@ -109,6 +154,76 @@ class AlpacaClient:
             return list(client.get_all_positions())
         except Exception:
             return []
+
+    def list_positions_strict(self) -> list:
+        """Return broker positions or raise; destructive EOD work must distinguish errors from flat."""
+        if not self._client:
+            raise RuntimeError("No Alpaca client available for position discovery.")
+        return list(self._client.get_all_positions())
+
+    def get_market_clock(self) -> MarketClock:
+        """Read Alpaca's market clock; any unusable value raises so callers fail closed."""
+        if not self._client or not hasattr(self._client, "get_clock"):
+            raise RuntimeError("Alpaca market clock is unavailable.")
+        clock = self._client.get_clock()
+        is_open = getattr(clock, "is_open", None)
+        timestamp = _clock_datetime(getattr(clock, "timestamp", None))
+        next_close = _clock_datetime(getattr(clock, "next_close", None))
+        if not isinstance(is_open, bool) or timestamp is None or next_close is None:
+            raise RuntimeError("Alpaca market clock did not provide a usable is_open flag, timestamp and next_close.")
+        return MarketClock(is_open=is_open, timestamp=timestamp, next_close=next_close)
+
+    def eod_cleanup_window(self) -> dict[str, Any]:
+        """Classify now against the pre-close cleanup window using only the broker's clock.
+
+        ``state`` is ``in_window`` (act now), ``before_window`` (too early; a later run covers it),
+        ``closed`` (the session is over, nothing can be sold safely) or ``unavailable`` (the clock
+        could not be read, which proves nothing and must be treated as a failure).
+        """
+        try:
+            clock = self.get_market_clock()
+        except Exception as exc:
+            return {"state": "unavailable", "minutes_to_close": None, "message": f"Alpaca market clock could not be read: {exc}"}
+        if not clock.is_open:
+            return {
+                "state": "closed",
+                "minutes_to_close": None,
+                "message": "The exchange is closed, so a DAY market SELL could not execute before this session's DAY stops expire.",
+            }
+        minutes_to_close = clock.minutes_to_close
+        if minutes_to_close <= 0:
+            return {"state": "closed", "minutes_to_close": minutes_to_close, "message": "Alpaca reports the session close has already passed."}
+        if minutes_to_close > self.fractional_eod_window_minutes:
+            return {
+                "state": "before_window",
+                "minutes_to_close": minutes_to_close,
+                "message": (
+                    f"{minutes_to_close:.0f} minutes remain before the close, outside the "
+                    f"{self.fractional_eod_window_minutes}-minute EOD cleanup window."
+                ),
+            }
+        return {"state": "in_window", "minutes_to_close": minutes_to_close, "message": None}
+
+    def _fractional_entry_cutoff_error(self) -> Optional[str]:
+        """Refuse a fractional DAY entry too close to the exchange close to be cleaned up.
+
+        Fractional equity is protected by a DAY stop that expires at the close and relies on the EOD
+        cleanup run to exit it. Inside the cleanup's pre-close window no later run exists, so the
+        entry would be left unprotected overnight. An unreadable clock cannot prove otherwise.
+        """
+        window = self.eod_cleanup_window()
+        state = window["state"]
+        if state == "unavailable":
+            return f"Fractional entry blocked: {window['message']} EOD cleanup coverage cannot be proven."
+        if state == "closed":
+            return "Fractional entry blocked: the exchange is closed, so this day's EOD cleanup can no longer exit a DAY stop."
+        if state == "in_window":
+            return (
+                f"Fractional entry blocked: only {window['minutes_to_close']:.0f} minutes remain before the exchange close, "
+                f"inside the {self.fractional_eod_window_minutes}-minute EOD cleanup window, so its expiring DAY "
+                "stop would not be exited."
+            )
+        return None
 
     def get_position(self, symbol: str):
         if not self._client:
@@ -244,6 +359,18 @@ class AlpacaClient:
                         requested_qty=qty,
                         status="rejected_fractional_unsupported",
                         message="BUY rejected: Alpaca does not report this asset as fractionable, so a fractional entry cannot be placed.",
+                        asset_type=asset_type,
+                        stop_price=stop_loss,
+                    )
+                cutoff_error = self._fractional_entry_cutoff_error()
+                if cutoff_error:
+                    return ExecutionResult(
+                        success=False,
+                        symbol=symbol,
+                        side=side_normalized,
+                        requested_qty=qty,
+                        status="fractional_entry_after_eod_cutoff",
+                        message=cutoff_error,
                         asset_type=asset_type,
                         stop_price=stop_loss,
                     )
@@ -699,7 +826,77 @@ class AlpacaClient:
             "message": "CRITICAL: standalone protective stop could not be confirmed after bounded polling.",
         }
 
-    def _place_exit_sell(self, symbol: str, qty: float, asset_type: str, current_position_qty: float = 0.0) -> ExecutionResult:
+    def close_position_for_eod(self, symbol: str, qty: float, asset_type: str, current_position_qty: float) -> ExecutionResult:
+        """Market-sell a fractional equity holding before its DAY stop expires at the close.
+
+        The protective stop is cancelled and verified first, the SELL is given a bounded fill
+        window and confirmed terminal before any reconciliation, and a residual quantity is
+        re-protected but still reported as a failure because its DAY stop expires at the close.
+        """
+        if not self.paper:
+            return ExecutionResult(False, symbol, "sell", qty, status="rejected_live_disabled", message="Paper trading is required for this bot.", asset_type=asset_type, eod_exit=True)
+        if not self._client:
+            return ExecutionResult(False, symbol, "sell", qty, status="skipped", message="No Alpaca credentials available; EOD cleanup cannot exit the position.", asset_type=asset_type, eod_exit=True)
+        if asset_type not in _EQUITY_ASSET_TYPES:
+            return ExecutionResult(False, symbol, "sell", qty, status="rejected_not_equity", message="EOD cleanup only exits stock/ETF positions.", asset_type=asset_type, eod_exit=True)
+        if qty <= 0 or current_position_qty <= 0 or qty > current_position_qty + 1e-9:
+            return ExecutionResult(False, symbol, "sell", qty, status="rejected_invalid_qty", message="EOD cleanup quantity must be positive and within the verified long position.", asset_type=asset_type, remaining_position_qty=current_position_qty, eod_exit=True)
+
+        result = self._place_exit_sell(symbol, qty, asset_type, current_position_qty=current_position_qty, confirm_terminal_fill=True)
+        result.eod_exit = True
+        if result.filled_qty > 0:
+            # A SELL cancelled after a partial fill still traded; the log and daily counts must see it.
+            result.counts_as_trade = True
+        remaining = result.actual_remaining_position_qty
+        if remaining is not None and remaining > 1e-9 and (result.success or result.filled_qty > 0) and not result.protection_failed:
+            # A partial exit left shares whose only protection is a DAY stop that expires at the close.
+            result.success = False
+            result.status = "eod_exit_incomplete"
+            protection_note = "re-protected by a DAY stop that expires at the close" if result.protection_active else "UNPROTECTED"
+            result.message = f"EOD cleanup for {symbol} filled {result.filled_qty:g} of {qty:g}; {remaining:g} remains ({protection_note})."
+            print(result.message)
+        return result
+
+    def _await_exit_terminal(self, order_id: Optional[str], symbol: str, submitted_order: Any) -> dict[str, Any]:
+        """Give an EOD market SELL a short fill window, then cancel and confirm its terminal state."""
+        latest = submitted_order
+        active_statuses = _FRACTIONAL_ENTRY_ACTIVE_STATUSES | _FRACTIONAL_ENTRY_CANCEL_PENDING_STATUSES
+        for attempt in range(1, self.exit_fill_poll_attempts + 1):
+            latest = self._refresh_order(order_id, nested=False) or latest
+            status = self._status_value(latest) or "unknown"
+            if status in _EXIT_TERMINAL_STATUSES:
+                return {"ok": True, "order": latest, "attempts": attempt, "message": None}
+            if status not in active_statuses:
+                return {"ok": False, "order": latest, "attempts": attempt, "message": f"CRITICAL: EOD SELL for {symbol} has ambiguous status '{status}'."}
+            self._sleep_between_polls()
+        try:
+            self._client.cancel_order_by_id(order_id)
+        except Exception:
+            pass  # A cancellation error can race a fill; only subsequent broker state is authoritative.
+        for cancel_attempt in range(1, self.cancel_poll_attempts + 1):
+            latest = self._refresh_order(order_id, nested=False) or latest
+            status = self._status_value(latest) or "unknown"
+            attempts = self.exit_fill_poll_attempts + cancel_attempt
+            if status in _EXIT_TERMINAL_STATUSES:
+                return {"ok": True, "order": latest, "attempts": attempts, "message": None}
+            if status not in active_statuses:
+                return {"ok": False, "order": latest, "attempts": attempts, "message": f"CRITICAL: EOD SELL for {symbol} has ambiguous status '{status}' after cancellation."}
+            self._sleep_between_polls()
+        return {
+            "ok": False,
+            "order": latest,
+            "attempts": self.exit_fill_poll_attempts + self.cancel_poll_attempts,
+            "message": f"CRITICAL: EOD SELL for {symbol} did not reach a terminal state after cancellation; it may still execute while no protective stop exists.",
+        }
+
+    def _place_exit_sell(
+        self,
+        symbol: str,
+        qty: float,
+        asset_type: str,
+        current_position_qty: float = 0.0,
+        confirm_terminal_fill: bool = False,
+    ) -> ExecutionResult:
         client = self._client
         if client is None:
             return ExecutionResult(False, symbol, "sell", qty, status="skipped", message="No Alpaca client available.", asset_type=asset_type)
@@ -809,7 +1006,35 @@ class AlpacaClient:
                 stop_price=restore_result.get("stop_price"),
             )
 
-        refreshed_order = self._refresh_order(self._order_identifier(submitted_order), nested=False) or submitted_order
+        exit_poll_attempts = 0
+        if confirm_terminal_fill:
+            # Protection is already cancelled, so the SELL must be proven terminal before any
+            # stop is restored; otherwise a late fill plus a restored stop could create a short.
+            completion = self._await_exit_terminal(self._order_identifier(submitted_order), symbol, submitted_order)
+            exit_poll_attempts = completion["attempts"]
+            refreshed_order = completion["order"] or submitted_order
+            if not completion["ok"]:
+                print(completion["message"])
+                return ExecutionResult(
+                    success=False,
+                    symbol=symbol,
+                    side="sell",
+                    requested_qty=qty,
+                    filled_qty=self._safe_float(getattr(refreshed_order, "filled_qty", 0.0)),
+                    entry_order_id=self._order_identifier(refreshed_order) or self._order_identifier(submitted_order),
+                    status="critical_unprotected_position",
+                    message=completion["message"],
+                    asset_type=asset_type,
+                    cancelled_protective_order_ids=cancellation_result["cancelled_ids"],
+                    protection_failed=bool(protective_orders),
+                    protection_reconciled=False,
+                    remaining_position_qty=current_position_qty,
+                    actual_remaining_position_qty=self.get_position_qty(symbol),
+                    cancel_poll_attempts=cancellation_result.get("poll_attempts", 0),
+                    exit_poll_attempts=exit_poll_attempts,
+                )
+        else:
+            refreshed_order = self._refresh_order(self._order_identifier(submitted_order), nested=False) or submitted_order
         status = self._status_value(refreshed_order) or self._status_value(submitted_order) or "accepted"
         filled_qty = max(
             self._safe_float(getattr(submitted_order, "filled_qty", 0.0)),
@@ -841,6 +1066,7 @@ class AlpacaClient:
             actual_remaining_position_qty=actual_remaining_qty,
             protection_reconciled=not protective_orders,
             cancel_poll_attempts=cancellation_result.get("poll_attempts", 0),
+            exit_poll_attempts=exit_poll_attempts,
         )
 
         if actual_remaining_qty is None:
