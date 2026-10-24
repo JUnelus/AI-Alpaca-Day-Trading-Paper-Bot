@@ -22,7 +22,9 @@ from .risk_manager import (
     RiskConfig,
     RiskEvaluationContext,
     RiskManager,
+    allows_fractional_equity_orders,
     normalize_qty_for_asset,
+    uses_fractional_quantity,
     validate_trade_startup_config,
 )
 from .strategy import BENCHMARK_SYMBOLS, MarketSnapshot, build_market_context, generate_signal, predict_next_day
@@ -61,12 +63,12 @@ def _safe_float(value, default: float = 0.0) -> float:
         return default
 
 
-def _calc_qty(price: float, asset_type: str, max_position_value: float) -> float:
+def _calc_qty(price: float, asset_type: str, max_position_value: float, allow_fractional: bool = False) -> float:
     """Compute share/unit quantity based on max position value."""
     if price <= 0:
         return 0.0
 
-    qty = normalize_qty_for_asset(asset_type, max_position_value / price)
+    qty = normalize_qty_for_asset(asset_type, max_position_value / price, allow_fractional=allow_fractional)
     if asset_type == "crypto":
         return qty if qty >= 0.0001 else 0.0
     return qty
@@ -407,14 +409,33 @@ def run_once(
 
         signal = generate_signal(snapshot, sym_cfg, market_context=market_context)
 
+        # Small budgets cannot buy a whole share of most watchlist stocks, so equity BUYs may be
+        # sized in fractional shares while account equity stays under the configured threshold.
+        # Crypto keeps its own precision; a failed asset lookup reads as not fractionable.
+        symbol_fractionable = alpaca.get_asset(sym).fractionable if asset_type in {"stock", "etf"} else False
+        fractional_buy_sizing_allowed = allows_fractional_equity_orders(
+            account.equity,
+            asset_type,
+            symbol_fractionable,
+            risk_config.fractional_equity_threshold,
+        )
+
         dca_position_value = max_position_value
         if signal.action == "buy" and "dca buy" in signal.reason.lower():
             # Stage into positions gradually to lower average cost over time.
             dca_position_value = max_position_value * 0.35
 
-        qty = _calc_qty(snapshot.last_price, asset_type, dca_position_value)
+        qty = _calc_qty(snapshot.last_price, asset_type, dca_position_value, allow_fractional=fractional_buy_sizing_allowed)
         decision = build_decision(signal, last_price=snapshot.last_price, default_qty=qty).to_dict()
         decision["requested_qty"] = decision.get("qty", qty)
+        action = str(decision.get("action", "hold")).lower()
+        held_qty = held_qty_map.get(sym, 0.0)
+        # SELL-to-close of an existing fractional position stays allowed even above the threshold.
+        allow_fractional = (
+            asset_type == "crypto"
+            or fractional_buy_sizing_allowed
+            or (action == "sell" and symbol_fractionable and uses_fractional_quantity(asset_type, held_qty))
+        )
 
         risk_context = RiskEvaluationContext(
             mode=mode,
@@ -433,8 +454,10 @@ def run_once(
             market_data_source=snapshot.source,
             market_data_service_available=market_data_result.service_available,
             daily_loss_triggered=daily_loss_triggered,
-            protective_stop_supported=alpaca.can_place_protected_buy(asset_type),
+            protective_stop_supported=alpaca.can_place_protected_buy(asset_type, allow_fractional=allow_fractional),
             allow_shorts=risk_config.allow_shorts,
+            symbol_fractionable=symbol_fractionable,
+            allow_fractional=allow_fractional,
         )
         risk = risk_manager.evaluate(decision=decision, context=risk_context)
 

@@ -80,12 +80,13 @@ ai-alpaca-day-trading-paper-bot/
 | Portfolio budget | `PORTFOLIO_SIZE=10000` |
 | Max position size | `MAX_POSITION_PERCENT=10` (default $1,000 per symbol) |
 | Max total gross exposure | `MAX_TOTAL_EXPOSURE_PERCENT=80` (default $8,000) |
+| Fractional equity sizing | `FRACTIONAL_EQUITY_THRESHOLD=20000`: stock/ETF BUYs may be sized in fractional shares while account equity is below this and Alpaca marks the asset fractionable |
 | Daily trade cap | `MAX_DAILY_TRADES=3` across the whole bot |
 | Per-symbol trade cap | Max 1 executed trade per symbol per trading day |
 | Daily loss circuit breaker | `MAX_DAILY_LOSS_PERCENT=2` blocks new BUYs after the threshold is hit |
 | Margin | `ALLOW_MARGIN=false` |
 | Shorts | `ALLOW_SHORTS=false` |
-| Protective stop policy | New long stock/ETF BUYs must have broker-side `GTC` broker-side stop protection or the entry is rejected |
+| Protective stop policy | New long stock/ETF BUYs must have broker-side stop protection or the entry is rejected: `GTC` for whole-share entries, `DAY` for fractional entries (Alpaca's only option) |
 | Crypto BUY safety | Rejected whenever reliable broker-side protective stops cannot be guaranteed |
 | Market-data safety | Fallback/demo prices are **never** eligible for paper-order execution |
 | Scheduled automation idempotency | Scheduled trade/report runs persist once-per-Eastern-trading-day markers |
@@ -105,11 +106,21 @@ ALLOW_MARGIN=false
 ALLOW_SHORTS=false
 MIN_CONFIDENCE=0.70
 MAX_RISK_PERCENT=1
+FRACTIONAL_EQUITY_THRESHOLD=20000
 ```
+
+### Fractional Equity Policy
+
+- New **stock/ETF BUY** sizing may use Alpaca-supported fractional quantities (4 decimal places) only when account equity is below `FRACTIONAL_EQUITY_THRESHOLD` (default `$20,000`) **and** Alpaca reports the asset as fractionable.
+- This is what lets a small budget trade at all: with `PORTFOLIO_SIZE=100` the per-symbol cap is `$10`, so a `$347` stock is sized to `0.0288` shares instead of being floored to zero.
+- At or above the threshold, new equity BUY quantities are floored to whole shares exactly as before. Crypto precision is unaffected by this policy.
+- Existing fractional positions remain eligible for **SELL-to-close** handling regardless of the threshold.
+- If the broker asset lookup fails, the asset is treated as **not fractionable** and a fractional BUY is rejected (fail closed).
 
 ### Protective Stop Behavior
 
-- For new long **stock/ETF BUY** orders, the bot submits broker-side protection through Alpaca-supported attached stop logic using **`GTC`** protection so the stop can persist beyond the current session.
+- For new long whole-share **stock/ETF BUY** orders, the bot submits broker-side protection through Alpaca-supported attached stop logic using **`GTC`** protection so the stop can persist beyond the current session.
+- Alpaca only accepts fractional equity orders as simple **`DAY`** market orders, so a fractional BUY is placed as a DAY market entry followed by a standalone **`DAY`** stop sized to the verified fill. The entry is given a bounded fill window, any unfilled remainder is cancelled before the stop is sized, and the stop is confirmed with bounded broker polling. That DAY stop **expires at the close**; this paper bot has no end-of-day cleanup job, so a fractional position held overnight is unprotected until it is sold.
 - Attached OTO protection is only treated as active after bounded polling confirms an actual stop child with a valid child order ID, stop price, side, and quantity.
 - If the bot cannot reliably create that protective stop, it **rejects the BUY** instead of placing an unprotected entry.
 - If an entry is accepted/executed but protection confirmation fails, the run records a **critical protection failure** and does not treat the trade as safely protected.

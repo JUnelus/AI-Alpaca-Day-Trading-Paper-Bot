@@ -6,6 +6,7 @@
   "max_daily_loss_percent": 2,
   "max_daily_trades": 3,
   "max_total_exposure_percent": 80,
+  "fractional_equity_threshold": 20000,
   "min_buying_power_to_trade": 500,
   "allow_margin": false,
   "allow_shorts": false,

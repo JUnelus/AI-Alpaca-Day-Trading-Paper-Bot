@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.alpaca_client import AccountSnapshot
+from src.alpaca_client import AccountSnapshot, BrokerAsset
 from src.execution_models import ExecutionResult
 from src.main import ConfigurationError, apply_execution_to_available_cash, run_once
 from src.market_data import MarketDataResult
@@ -14,8 +14,9 @@ from src.strategy import MarketSnapshot, StrategySignal
 
 
 class DummyAlpacaClient:
-    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True):
+    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True, fractionable=True):
         self.paper = paper
+        self.fractionable = fractionable
         self._execution_results = list(execution_results or [])
         self._positions = list(positions or [])
         self._account = account or AccountSnapshot(equity=10_000.0, cash=5_000.0, buying_power=5_000.0)
@@ -40,7 +41,10 @@ class DummyAlpacaClient:
                 return float(getattr(position, "qty", 0.0))
         return 0.0
 
-    def can_place_protected_buy(self, asset_type: str) -> bool:
+    def get_asset(self, symbol: str):
+        return BrokerAsset(symbol=symbol, tradable=True, fractionable=self.fractionable)
+
+    def can_place_protected_buy(self, asset_type: str, allow_fractional: bool = False) -> bool:
         return asset_type in {"stock", "etf"}
 
     def place_paper_trade(self, **kwargs):

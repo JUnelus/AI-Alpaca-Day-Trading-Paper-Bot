@@ -1,11 +1,22 @@
 from types import SimpleNamespace
 
+import pytest
+
+from src import alpaca_client as alpaca_client_module
 from src.alpaca_client import AlpacaClient
+
+# The fractional-entry tests build real alpaca-py request objects, so they need the SDK installed
+# (as CI does via requirements.txt); the long-standing tests above are left as they were.
+_requires_alpaca_sdk = pytest.mark.skipif(
+    alpaca_client_module.TimeInForce is None,
+    reason="alpaca-py is not installed; Alpaca request/enum types are unavailable",
+)
 
 
 class RecordingTradingClient:
-    def __init__(self, responses=None, open_orders=None, cancel_fail_ids=None, order_sequences=None, positions=None):
+    def __init__(self, responses=None, open_orders=None, cancel_fail_ids=None, order_sequences=None, positions=None, fractionable=True):
         self.responses = list(responses or [])
+        self.fractionable = fractionable
         self.orders = []
         self.lookup = {}
         self.open_orders = []
@@ -42,6 +53,9 @@ class RecordingTradingClient:
                 return sequence.pop(0)
             return sequence[0]
         return self.lookup.get(str(order_id))
+
+    def get_asset(self, symbol):
+        return SimpleNamespace(symbol=symbol, tradable=True, fractionable=self.fractionable)
 
     def get_open_position(self, symbol):
         for position in self.positions:
@@ -744,3 +758,187 @@ def test_attached_stop_child_with_invalid_quantity_fails_closed():
     assert result.protection_failed
 
 
+
+
+# ── fractional equity entries (small budgets) ─────────────────────────────────
+
+
+def _fractional_buy(alpaca, qty=0.0288, symbol="AAPL"):
+    return alpaca.place_paper_trade(
+        symbol=symbol,
+        qty=qty,
+        side="buy",
+        asset_type="stock",
+        mode="trade",
+        stop_loss=340.0,
+    )
+
+
+@_requires_alpaca_sdk
+def test_fractional_stock_buy_uses_day_entry_and_confirmed_day_stop():
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="filled", filled_qty=0.0288, filled_avg_price=347.0, order_class=None, legs=[])
+    stop = _order(id="stop-1", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=0.0288, time_in_force="day")
+    client = RecordingTradingClient([entry, stop])
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    assert alpaca.can_place_protected_buy("stock", allow_fractional=True)
+    result = _fractional_buy(alpaca)
+
+    entry_request, stop_request = client.orders
+    assert entry_request.qty == 0.0288
+    assert entry_request.time_in_force.value == "day"
+    assert getattr(entry_request, "stop_loss", None) is None
+    assert stop_request.qty == 0.0288
+    assert stop_request.time_in_force.value == "day"
+    assert stop_request.stop_price == 340.0
+    assert result.success
+    assert result.protection_active
+    assert result.protective_order_id == "stop-1"
+    assert result.protection_time_in_force == "day"
+    assert result.requires_eod_exit
+    assert result.counts_as_trade
+
+
+def test_fractional_stock_buy_is_rejected_when_broker_asset_is_not_fractionable():
+    client = RecordingTradingClient([], fractionable=False)
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = _fractional_buy(alpaca)
+
+    assert not result.success
+    assert result.status == "rejected_fractional_unsupported"
+    assert client.orders == []
+
+
+@_requires_alpaca_sdk
+def test_whole_share_buy_still_uses_attached_gtc_route():
+    stop_leg = _order(id="stop-1", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=1.0)
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="accepted", filled_qty=1.0, filled_avg_price=347.0, order_class="oto", legs=[stop_leg])
+    client = RecordingTradingClient([entry])
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = _fractional_buy(alpaca, qty=1.0)
+
+    assert client.orders[0].time_in_force.value == "gtc"
+    assert client.orders[0].order_class.value == "oto"
+    assert result.success
+    assert result.protection_time_in_force is None
+    assert not result.requires_eod_exit
+
+
+@_requires_alpaca_sdk
+def test_fractional_entry_unfilled_remainder_is_cancelled_before_any_stop():
+    pending = _order(id="entry-1", symbol="AAPL", side="buy", status="accepted", filled_qty=0.0, order_class=None, legs=[])
+    cancelled = _order(id="entry-1", symbol="AAPL", side="buy", status="canceled", filled_qty=0.0, order_class=None, legs=[])
+    client = RecordingTradingClient(
+        [pending],
+        order_sequences={"entry-1": [pending, pending, pending, pending, cancelled]},
+    )
+    alpaca = _alpaca(client, paper=True, entry_fill_poll_attempts=3, cancel_poll_attempts=5)
+
+    result = _fractional_buy(alpaca)
+
+    assert client.cancelled_ids == ["entry-1"]
+    assert len(client.orders) == 1  # no stop was created for a zero fill
+    assert result.success
+    assert result.status == "entry_canceled_no_fill"
+    assert not result.counts_as_trade
+    assert not result.protection_failed
+    assert result.entry_cancel_attempted and result.entry_cancel_confirmed
+
+
+@_requires_alpaca_sdk
+def test_fractional_partial_fill_cancels_remainder_and_protects_only_filled_qty():
+    partial = _order(id="entry-1", symbol="AAPL", side="buy", status="partially_filled", filled_qty=0.01, filled_avg_price=347.0, order_class=None, legs=[])
+    settled = _order(id="entry-1", symbol="AAPL", side="buy", status="canceled", filled_qty=0.01, filled_avg_price=347.0, order_class=None, legs=[])
+    stop = _order(id="stop-1", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=0.01, time_in_force="day")
+    client = RecordingTradingClient(
+        [partial, stop],
+        order_sequences={"entry-1": [partial, partial, partial, partial, settled]},
+    )
+    alpaca = _alpaca(client, paper=True, entry_fill_poll_attempts=3, cancel_poll_attempts=5)
+
+    result = _fractional_buy(alpaca)
+
+    assert client.cancelled_ids == ["entry-1"]
+    stop_request = client.orders[1]
+    assert stop_request.qty == 0.01
+    assert stop_request.time_in_force.value == "day"
+    assert result.success
+    assert result.filled_qty == 0.01
+    assert result.protection_active
+    assert result.requires_eod_exit
+
+
+@_requires_alpaca_sdk
+def test_fractional_entry_that_never_settles_fails_closed():
+    pending = _order(id="entry-1", symbol="AAPL", side="buy", status="accepted", filled_qty=0.0, order_class=None, legs=[])
+    client = RecordingTradingClient([pending], order_sequences={"entry-1": [pending]})
+    alpaca = _alpaca(client, paper=True, entry_fill_poll_attempts=2, cancel_poll_attempts=2)
+
+    result = _fractional_buy(alpaca)
+
+    assert not result.success
+    assert result.status == "entry_state_ambiguous"
+    assert client.cancelled_ids == ["entry-1"]
+    assert len(client.orders) == 1
+    assert "CRITICAL" in (result.message or "")
+
+
+@_requires_alpaca_sdk
+def test_fractional_day_stop_that_is_rejected_by_broker_is_a_protection_failure():
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="filled", filled_qty=0.0288, filled_avg_price=347.0, order_class=None, legs=[])
+    rejected_stop = _order(id="stop-1", symbol="AAPL", side="sell", status="rejected", stop_price=340.0, qty=0.0288, time_in_force="day")
+    client = RecordingTradingClient([entry, rejected_stop])
+    alpaca = _alpaca(client, paper=True, stop_confirmation_poll_attempts=2)
+
+    result = _fractional_buy(alpaca)
+
+    assert not result.success
+    assert result.status == "protection_failed"
+    assert result.protection_failed
+    assert result.counts_as_trade
+    assert "CRITICAL" in (result.message or "")
+
+
+@_requires_alpaca_sdk
+def test_fractional_stop_placement_failure_is_surfaced_clearly():
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="filled", filled_qty=0.0288, filled_avg_price=347.0, order_class=None, legs=[])
+    client = RecordingTradingClient([entry, RuntimeError("fractional stop rejected")])
+    alpaca = _alpaca(client, paper=True)
+
+    result = _fractional_buy(alpaca)
+
+    assert not result.success
+    assert result.status == "protection_failed"
+    assert result.requires_eod_exit
+    assert "fractional stop rejected" in (result.message or "")
+
+
+@_requires_alpaca_sdk
+def test_partial_sell_of_fractional_position_replaces_protection_with_day_stop():
+    old_stop = _order(id="stop-old", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.01, filled_qty=0.01, filled_avg_price=350.0, status="filled", order_class=None, legs=[])
+    replacement_stop = _order(id="stop-new", symbol="AAPL", side="sell", qty=0.02, stop_price=340.0, status="new", time_in_force="day")
+    client = RecordingTradingClient(
+        responses=[sell_order, replacement_stop],
+        open_orders=[old_stop],
+        positions=[_order(symbol="AAPL", qty="0.02", side="long")],
+    )
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = alpaca.place_paper_trade(
+        symbol="AAPL",
+        qty=0.01,
+        side="sell",
+        asset_type="stock",
+        mode="trade",
+        current_position_qty=0.03,
+    )
+
+    assert result.success, result.message
+    assert result.cancelled_protective_order_ids == ["stop-old"]
+    assert result.replacement_protective_order_id == "stop-new"
+    assert client.orders[0].time_in_force.value == "day"
+    assert client.orders[1].qty == 0.02
+    assert client.orders[1].time_in_force.value == "day"
