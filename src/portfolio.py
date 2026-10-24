@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from .alpaca_client import AlpacaClient
 
-STARTING_BALANCE: float = 10_000.00
+STARTING_BALANCE: float = 100.00
 STATE_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "portfolio_state.json")
 
 _CRYPTO_NORMALIZE: Dict[str, str] = {

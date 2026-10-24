@@ -61,7 +61,7 @@ jobs:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_PAPER:      'true'
-          PORTFOLIO_SIZE:    '10000'
+          PORTFOLIO_SIZE:    '100'
           MAX_POSITION_PERCENT: '10'
           MAX_DAILY_LOSS_PERCENT: '2'
           MAX_DAILY_TRADES: '3'
@@ -125,7 +125,7 @@ jobs:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_PAPER:      'true'
-          PORTFOLIO_SIZE:    '10000'
+          PORTFOLIO_SIZE:    '100'
           MAX_POSITION_PERCENT: '10'
           MAX_DAILY_LOSS_PERCENT: '2'
           MAX_DAILY_TRADES: '3'
@@ -189,7 +189,7 @@ jobs:
           ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ALPACA_PAPER:      'true'
-          PORTFOLIO_SIZE:    '10000'
+          PORTFOLIO_SIZE:    '100'
           MAX_POSITION_PERCENT: '10'
           MAX_DAILY_LOSS_PERCENT: '2'
           MAX_DAILY_TRADES: '3'

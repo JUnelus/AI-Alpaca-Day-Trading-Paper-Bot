@@ -92,7 +92,7 @@ def generate_dashboard(
             "### ⚠️ LEGACY PAPER ACCOUNT STATE",
             "",
             "The current Alpaca paper account contains positions created before the present "
-            "`$10,000` risk controls were enforced.",
+            f"`${state.starting_balance:,.2f}` risk controls were enforced.",
             "",
             "Current broker equity/P&L should not be interpreted as performance of the current hardened strategy.",
             "",

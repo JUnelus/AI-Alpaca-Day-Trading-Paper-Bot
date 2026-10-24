@@ -184,7 +184,7 @@ def _build_safety_warnings(
             f"Current gross exposure ${state.gross_exposure:.2f} exceeds the configured limit of ${max_total_exposure:.2f}. New BUY orders are blocked until exposure is reduced."
         )
         warnings.append(
-            "LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $10,000 strategy controls were enforced."
+            f"LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened ${risk_config.portfolio_size:,.2f} strategy controls were enforced."
         )
 
     for pos in state.positions:

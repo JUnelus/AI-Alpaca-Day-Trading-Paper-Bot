@@ -2,7 +2,7 @@
 
 AI-powered Alpaca **paper-trading** bot using Python, risk management, structured AI decisions, and automated trade analytics.
 
-**$10,000 configured paper portfolio · 10 symbols · fail-closed safety checks · GitHub Actions trade/report schedules**
+**$100 configured paper portfolio (mirrors the live bot's strategy capital) · 10 symbols · fail-closed safety checks · GitHub Actions trade/report schedules**
 
 > This repository remains **Alpaca paper-trading only**. No supported path in this repo enables Alpaca live trading.
 
@@ -77,9 +77,9 @@ ai-alpaca-day-trading-paper-bot/
 | Entry logic | Existing strategy / AI logic preserved, but enforced through fail-closed risk checks |
 | Min AI confidence | `MIN_CONFIDENCE=0.70` |
 | Max account risk per trade | `MAX_RISK_PERCENT=1`, applied to `min(PORTFOLIO_SIZE, live account equity)` |
-| Portfolio budget | `PORTFOLIO_SIZE=10000` |
-| Max position size | `MAX_POSITION_PERCENT=10` (default $1,000 per symbol) |
-| Max total gross exposure | `MAX_TOTAL_EXPOSURE_PERCENT=80` (default $8,000) |
+| Portfolio budget | `PORTFOLIO_SIZE=100` — matches the live bot's dynamic strategy capital (50% of its $200 live account) |
+| Max position size | `MAX_POSITION_PERCENT=10` (default $10 per symbol) |
+| Max total gross exposure | `MAX_TOTAL_EXPOSURE_PERCENT=80` (default $80) |
 | Daily trade cap | `MAX_DAILY_TRADES=3` across the whole bot |
 | Per-symbol trade cap | Max 1 executed trade per symbol per trading day |
 | Daily loss circuit breaker | `MAX_DAILY_LOSS_PERCENT=2` blocks new BUYs after the threshold is hit |
@@ -96,7 +96,7 @@ ai-alpaca-day-trading-paper-bot/
 These values live in `config/watchlist.json` and can be overridden in `.env`:
 
 ```dotenv
-PORTFOLIO_SIZE=10000
+PORTFOLIO_SIZE=100
 MAX_POSITION_PERCENT=10
 MAX_DAILY_LOSS_PERCENT=2
 MAX_DAILY_TRADES=3
@@ -132,7 +132,7 @@ MAX_RISK_PERCENT=1
 min(PORTFOLIO_SIZE, current account equity)
 ```
 
-- Example: if `PORTFOLIO_SIZE=10000` and Alpaca paper equity is `$108,000`, a `1%` max-risk policy still limits allowed trade risk to `$100`.
+- Example: if `PORTFOLIO_SIZE=100` and Alpaca paper equity is `$108,000`, a `1%` max-risk policy still limits allowed trade risk to `$1`.
 - If live paper equity falls below the configured budget, the bot becomes even more conservative and uses the lower equity value instead.
 
 ### Daily P&L Consistency
@@ -219,7 +219,7 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-10-23 20:25 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-10-24 15:38 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -227,8 +227,8 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 | Metric | Value |
 |:-------|------:|
-| 🧭 Configured Strategy Budget | `$10,000.00` |
-| 🛡️ Strategy Max Gross Exposure | `$8,000.00` |
+| 🧭 Configured Strategy Budget | `$100.00` |
+| 🛡️ Strategy Max Gross Exposure | `$80.00` |
 | 💵 Alpaca Paper Account Equity | `$114,974.92` |
 | 💸 Broker Cash Available | `$-118,533.96` |
 | 🧾 Broker Buying Power | `$117,159.04` |
@@ -238,7 +238,7 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 ### ⚠️ LEGACY PAPER ACCOUNT STATE
 
-The current Alpaca paper account contains positions created before the present `$10,000` risk controls were enforced.
+The current Alpaca paper account contains positions created before the present `$100.00` risk controls were enforced.
 
 Current broker equity/P&L should not be interpreted as performance of the current hardened strategy.
 
@@ -246,22 +246,22 @@ The bot will warn, block additional BUY exposure, and continue allowing valid ri
 
 ### ⚠️ Safety Warnings
 
-- Current gross exposure $233508.88 exceeds the configured limit of $8000.00. New BUY orders are blocked until exposure is reduced.
-- LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $10,000 strategy controls were enforced.
-- Existing AAPL position value $24335.50 exceeds the configured per-position limit of $1000.00.
-- Existing AMZN position value $14910.08 exceeds the configured per-position limit of $1000.00.
-- Existing AVGO position value $6767.04 exceeds the configured per-position limit of $1000.00.
-- Existing BTC/USD position value $16687.63 exceeds the configured per-position limit of $1000.00.
-- Existing ETH/USD position value $1499.79 exceeds the configured per-position limit of $1000.00.
-- Existing GOOGL position value $10915.96 exceeds the configured per-position limit of $1000.00.
-- Existing LLY position value $58629.02 exceeds the configured per-position limit of $1000.00.
-- Existing META position value $19247.41 exceeds the configured per-position limit of $1000.00.
-- Existing MSFT position value $16788.96 exceeds the configured per-position limit of $1000.00.
-- Existing NVDA position value $38201.15 exceeds the configured per-position limit of $1000.00.
-- Existing SOL/USD position value $1595.84 exceeds the configured per-position limit of $1000.00.
-- Existing SPY position value $4563.84 exceeds the configured per-position limit of $1000.00.
-- Existing TSLA position value $8921.04 exceeds the configured per-position limit of $1000.00.
-- Existing VTI position value $10445.60 exceeds the configured per-position limit of $1000.00.
+- Current gross exposure $233508.88 exceeds the configured limit of $80.00. New BUY orders are blocked until exposure is reduced.
+- LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $100.00 strategy controls were enforced.
+- Existing AAPL position value $24335.50 exceeds the configured per-position limit of $10.00.
+- Existing AMZN position value $14910.08 exceeds the configured per-position limit of $10.00.
+- Existing AVGO position value $6767.04 exceeds the configured per-position limit of $10.00.
+- Existing BTC/USD position value $16687.63 exceeds the configured per-position limit of $10.00.
+- Existing ETH/USD position value $1499.79 exceeds the configured per-position limit of $10.00.
+- Existing GOOGL position value $10915.96 exceeds the configured per-position limit of $10.00.
+- Existing LLY position value $58629.02 exceeds the configured per-position limit of $10.00.
+- Existing META position value $19247.41 exceeds the configured per-position limit of $10.00.
+- Existing MSFT position value $16788.96 exceeds the configured per-position limit of $10.00.
+- Existing NVDA position value $38201.15 exceeds the configured per-position limit of $10.00.
+- Existing SOL/USD position value $1595.84 exceeds the configured per-position limit of $10.00.
+- Existing SPY position value $4563.84 exceeds the configured per-position limit of $10.00.
+- Existing TSLA position value $8921.04 exceeds the configured per-position limit of $10.00.
+- Existing VTI position value $10445.60 exceeds the configured per-position limit of $10.00.
 
 ### 📝 Daily Trade Summary
 
@@ -292,16 +292,16 @@ The bot will warn, block additional BUY exposure, and continue allowing valid ri
 
 | # | Symbol | Name | Type | Last Price | Day Change | Signal | Confidence |
 |--:|:-------|:-----|:----:|-----------:|-----------:|:------:|:----------:|
-| 1 | **NVDA** | NVIDIA Corp. | STOCK | $211.14 | 🔴 -0.53% | HOLD | — |
-| 2 | **AAPL** | Apple Inc. | STOCK | $347.69 | 🔴 -0.19% | HOLD | — |
-| 3 | **GOOGL** | Alphabet Inc. | STOCK | $320.23 | 🔴 -1.22% | HOLD | — |
-| 4 | **MSFT** | Microsoft Corp. | STOCK | $524.38 | 🟢 +0.53% | HOLD | — |
-| 5 | **AMZN** | Amazon.com Inc. | STOCK | $247.99 | 🔴 -0.96% | HOLD | — |
-| 6 | **VTI** | Vanguard Total Stock Market ETF | ETF | $373.00 | 🔴 -0.51% | HOLD | — |
-| 7 | **META** | Meta Platforms Inc. | STOCK | $642.24 | 🔴 -1.00% | HOLD | — |
-| 8 | **BTC/USD** | Bitcoin | CRYPTO | $81,246.54 | 🔴 -0.08% | HOLD | — |
-| 9 | **AVGO** | Broadcom Inc. | STOCK | $321.74 | 🔴 -0.49% | HOLD | — |
-| 10 | **LLY** | Eli Lilly and Co. | STOCK | $1,274.27 | 🔴 -2.49% | HOLD | — |
+| 1 | **AAPL** | Apple Inc. | STOCK | — | — | — | — |
+| 2 | **NVDA** | NVIDIA Corp. | STOCK | — | — | — | — |
+| 3 | **TSLA** | Tesla Inc. | STOCK | — | — | — | — |
+| 4 | **MSFT** | Microsoft Corp. | STOCK | — | — | — | — |
+| 5 | **AMZN** | Amazon.com Inc. | STOCK | — | — | — | — |
+| 6 | **META** | Meta Platforms Inc. | STOCK | — | — | — | — |
+| 7 | **SPY** | SPDR S&P 500 ETF | ETF | — | — | — | — |
+| 8 | **BTC/USD** | Bitcoin | CRYPTO | — | — | — | — |
+| 9 | **ETH/USD** | Ethereum | CRYPTO | — | — | — | — |
+| 10 | **SOL/USD** | Solana | CRYPTO | — | — | — | — |
 
 ---
 
@@ -311,16 +311,16 @@ The bot will warn, block additional BUY exposure, and continue allowing valid ri
 
 | # | Symbol | Name | Predicted Action | Confidence | Basis |
 |--:|:-------|:-----|:----------------:|-----------:|:------|
-| 1 | **NVDA** | NVIDIA Corp. | **SELL** | 48% | Moderate negative momentum (-0.53%) — continuation expected |
-| 2 | **AAPL** | Apple Inc. | HOLD | 50% | Flat session today (-0.19%) — no trend to carry forward |
-| 3 | **GOOGL** | Alphabet Inc. | **SELL** | 48% | Moderate negative momentum (-1.22%) — continuation expected |
-| 4 | **MSFT** | Microsoft Corp. | **BUY** | 48% | Moderate positive momentum (+0.53%) — continuation expected |
-| 5 | **AMZN** | Amazon.com Inc. | **SELL** | 48% | Moderate negative momentum (-0.96%) — continuation expected |
-| 6 | **VTI** | Vanguard Total Stock Market ETF | **SELL** | 48% | Moderate negative momentum (-0.51%) — continuation expected |
-| 7 | **META** | Meta Platforms Inc. | **SELL** | 48% | Moderate negative momentum (-1.00%) — continuation expected |
-| 8 | **BTC/USD** | Bitcoin | HOLD | 50% | Flat session today (-0.08%) — no trend to carry forward |
-| 9 | **AVGO** | Broadcom Inc. | **SELL** | 48% | Moderate negative momentum (-0.49%) — continuation expected |
-| 10 | **LLY** | Eli Lilly and Co. | **SELL** | 48% | Moderate negative momentum (-2.49%) — continuation expected |
+| 1 | **AAPL** | Apple Inc. | — | — | — |
+| 2 | **NVDA** | NVIDIA Corp. | — | — | — |
+| 3 | **TSLA** | Tesla Inc. | — | — | — |
+| 4 | **MSFT** | Microsoft Corp. | — | — | — |
+| 5 | **AMZN** | Amazon.com Inc. | — | — | — |
+| 6 | **META** | Meta Platforms Inc. | — | — | — |
+| 7 | **SPY** | SPDR S&P 500 ETF | — | — | — |
+| 8 | **BTC/USD** | Bitcoin | — | — | — |
+| 9 | **ETH/USD** | Ethereum | — | — | — |
+| 10 | **SOL/USD** | Solana | — | — | — |
 
 ---
 

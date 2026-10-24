@@ -168,7 +168,7 @@ def _build_html_email(state, executed_trades, open_positions, predictions) -> st
             </table>
         </div>
 
-        {'<p><strong>Legacy account warning:</strong> The current Alpaca paper account contains positions created before the current $10,000 risk controls were enforced.</p>' if state.gross_exposure > state.max_total_exposure else ''}
+        {'<p><strong>Legacy account warning:</strong> The current Alpaca paper account contains positions created before the current $' + f'{state.starting_balance:,.2f}' + ' risk controls were enforced.</p>' if state.gross_exposure > state.max_total_exposure else ''}
         {'<p><strong>P&L data quality:</strong> Partial — broker cost basis or unrealized P&L is unavailable for ' + str(state.unknown_position_pnl_count) + ' position(s).</p>' if not state.pnl_data_complete else ''}
         
         <h2>📝 Executed Today</h2>

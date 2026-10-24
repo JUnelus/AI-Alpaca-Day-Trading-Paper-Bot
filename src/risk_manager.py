@@ -10,7 +10,7 @@ from .time_utils import trading_day
 
 @dataclass(frozen=True)
 class RiskConfig:
-    portfolio_size: float = 10_000.0
+    portfolio_size: float = 100.0
     max_position_percent: float = 10.0
     max_daily_loss_percent: float = 2.0
     max_daily_trades: int = 3
@@ -24,7 +24,7 @@ class RiskConfig:
     def from_sources(cls, config: Optional[dict] = None) -> "RiskConfig":
         config = config or {}
         return cls(
-            portfolio_size=_env_float("PORTFOLIO_SIZE", config.get("portfolio_size", 10_000)),
+            portfolio_size=_env_float("PORTFOLIO_SIZE", config.get("portfolio_size", 100)),
             max_position_percent=_env_float("MAX_POSITION_PERCENT", config.get("max_position_pct", 10)),
             max_daily_loss_percent=_env_float("MAX_DAILY_LOSS_PERCENT", config.get("max_daily_loss_percent", 2)),
             max_daily_trades=_env_int("MAX_DAILY_TRADES", config.get("max_daily_trades", 3)),

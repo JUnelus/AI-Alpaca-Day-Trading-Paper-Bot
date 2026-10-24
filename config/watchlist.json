@@ -1,5 +1,5 @@
 {
-  "portfolio_size": 10000,
+  "portfolio_size": 100,
   "max_position_pct": 10,
   "min_confidence": 0.70,
   "max_risk_percent": 1,
