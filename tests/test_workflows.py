@@ -33,7 +33,9 @@ def test_bot_workflow_has_concurrency_and_dst_safe_schedules():
     assert "group: alpaca-paper-trading-bot" in content
     assert "cancel-in-progress: false" in content
     assert content.count("timezone: 'America/New_York'") == 2
-    assert "45 9 * * 1-5" in content
+    assert "cron: '15 10 * * 1-5'" in content
+    assert "github.event.schedule == '15 10 * * 1-5'" in content  # the trade job keys on the same cron it is scheduled with
+    assert "45 9 * * 1-5" not in content
     assert "15 16 * * 1-5" in content
     assert "45 13 * * 1-5" not in content
     assert "45 14 * * 1-5" not in content

@@ -32,7 +32,7 @@ concurrency:
 jobs:
   scheduled-trade:
     name: Scheduled Trade Run
-    if: github.event_name == 'schedule' && github.event.schedule == '45 9 * * 1-5' && github.actor != 'github-actions[bot]'
+    if: github.event_name == 'schedule' && github.event.schedule == '15 10 * * 1-5' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
