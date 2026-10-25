@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import os
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
@@ -17,6 +18,9 @@ _FRACTIONAL_ENTRY_ACTIVE_STATUSES = {"accepted", "new", "pending_new", "partiall
 _FRACTIONAL_ENTRY_CANCEL_PENDING_STATUSES = {"pending_cancel"}
 _FRACTIONAL_ENTRY_NO_FILL_TERMINAL_STATUSES = {"canceled", "cancelled", "rejected", "expired"}
 _EXIT_TERMINAL_STATUSES = {"filled", "canceled", "cancelled", "rejected", "expired"}
+# Only these broker statuses prove a standalone stop is resting at the broker; transitional
+# (pending_new / pending_cancel) or missing statuses keep polling instead of counting as protection.
+_ACTIVE_STOP_STATUSES = {"accepted", "new", "held", "open", "partially_filled"}
 # Minutes before the exchange close in which the EOD cleanup acts and new fractional entries are
 # refused: an entry accepted inside it has no later cleanup run, so its DAY stop would expire naked.
 DEFAULT_FRACTIONAL_EOD_WINDOW_MINUTES = 30
@@ -577,6 +581,9 @@ class AlpacaClient:
 
         if not entry_completion["ok"]:
             print(entry_completion["message"])
+            # The order may still execute, so it must reserve its trade slot, cash and exposure
+            # as if the full requested quantity had filled; otherwise later BUYs in the same run
+            # could exceed the daily, cash or exposure limits once it fills.
             return ExecutionResult(
                 success=False,
                 symbol=symbol,
@@ -586,8 +593,8 @@ class AlpacaClient:
                 filled_avg_price=filled_avg_price,
                 entry_order_id=entry_order_id,
                 protection_active=False,
-                protection_failed=filled_qty > 0.0,
-                counts_as_trade=filled_qty > 0.0,
+                protection_failed=True,
+                counts_as_trade=True,
                 status="entry_state_ambiguous",
                 message=entry_completion["message"],
                 stop_price=stop_loss,
@@ -661,6 +668,13 @@ class AlpacaClient:
             )
 
         stop_qty = min(qty, filled_qty)
+        fractional_entry = requires_eod_exit
+        if fractional_entry and not uses_fractional_quantity(asset_type, stop_qty):
+            # A fractional request that filled to a whole-share quantity can carry a GTC stop like
+            # any whole-share position, so it is not left to the EOD cleanup's quantity filter.
+            stop_time_in_force = TimeInForce.GTC
+            protection_tif = "gtc"
+            requires_eod_exit = False
         stop_order = StopOrderRequest(
             symbol=symbol,
             qty=stop_qty,
@@ -697,7 +711,7 @@ class AlpacaClient:
                 terminal_entry_status=entry_status,
             )
 
-        if requires_eod_exit:
+        if fractional_entry:
             # A DAY stop is the only protection a fractional position gets, so confirm the
             # broker actually holds it before reporting the entry as protected.
             confirmation = self._poll_for_standalone_stop(
@@ -733,7 +747,11 @@ class AlpacaClient:
                     terminal_entry_status=entry_status,
                 )
             stop_confirmation_attempts = confirmation["attempts"]
-            message = "Fractional entry filled and DAY protective stop confirmed with Alpaca; the stop expires at the close."
+            message = (
+                "Fractional entry filled and DAY protective stop confirmed with Alpaca; the stop expires at the close."
+                if requires_eod_exit
+                else "Fractional request filled to a whole-share quantity; GTC protective stop confirmed with Alpaca."
+            )
         else:
             refreshed_stop = self._refresh_order(self._order_identifier(submitted_stop), nested=False) or submitted_stop
             stop_confirmation_attempts = 0
@@ -793,7 +811,9 @@ class AlpacaClient:
                     "cancel_confirmed": False, "terminal_status": status,
                     "message": f"CRITICAL: fractional entry for {symbol} has ambiguous broker status '{status}'; protection and further submission are blocked.",
                 }
-            if attempts > fill_window and not cancel_attempted:
+            if attempts >= fill_window and not cancel_attempted:
+                # Cancel right after the last fill-window poll so every cancel_poll_attempts
+                # iteration can observe the cancellation instead of consuming one to send it.
                 cancel_attempted = True
                 try:
                     self._client.cancel_order_by_id(order_id)
@@ -815,7 +835,7 @@ class AlpacaClient:
             last_order = self._refresh_order(order_id, nested=False)
             if (
                 self._is_valid_stop_order(last_order, expected_stop_price, expected_qty, expected_time_in_force)
-                and self._status_value(last_order) not in _FRACTIONAL_ENTRY_NO_FILL_TERMINAL_STATUSES
+                and self._status_value(last_order) in _ACTIVE_STOP_STATUSES
             ):
                 return {"ok": True, "order": last_order, "attempts": attempt, "message": None}
             self._sleep_between_polls()
@@ -940,15 +960,49 @@ class AlpacaClient:
             )
 
         tif = TimeInForce.GTC if asset_type == "crypto" or "/" in symbol else TimeInForce.DAY
+        # A stable client order ID lets a SELL whose submission raised (e.g. a response timeout)
+        # be found again, so protection is never restored on top of an exit the broker accepted.
+        client_order_id = f"paper-{'eod' if confirm_terminal_fill else 'sell'}-{self._normalize_symbol(symbol).lower()}-{uuid.uuid4().hex[:12]}"
         order = MarketOrderRequest(
             symbol=symbol,
             qty=qty,
             side=OrderSide.SELL,
             time_in_force=tif,
+            client_order_id=client_order_id,
         )
+        submission_error: Optional[Exception] = None
+        submitted_order = None
         try:
             submitted_order = client.submit_order(order)
         except Exception as exc:
+            submission_error = exc
+            recovered_order, lookup_reliable = self._lookup_order_by_client_id(client_order_id)
+            if recovered_order is not None:
+                # The broker accepted the SELL despite the error; continue with it as submitted.
+                submitted_order = recovered_order
+            elif not lookup_reliable:
+                message = (
+                    f"CRITICAL: SELL submission for {symbol} raised ({exc}) and the broker could not confirm whether "
+                    f"order {client_order_id} exists; protection was NOT restored because the SELL may still execute."
+                )
+                print(message)
+                return ExecutionResult(
+                    success=False,
+                    symbol=symbol,
+                    side="sell",
+                    requested_qty=qty,
+                    status="critical_unprotected_position",
+                    message=message,
+                    asset_type=asset_type,
+                    cancelled_protective_order_ids=cancellation_result["cancelled_ids"],
+                    protection_failed=bool(protective_orders),
+                    protection_reconciled=False,
+                    remaining_position_qty=current_position_qty,
+                    actual_remaining_position_qty=self.get_position_qty(symbol),
+                    cancel_poll_attempts=cancellation_result.get("poll_attempts", 0),
+                )
+        if submission_error is not None and submitted_order is None:
+            exc = submission_error
             actual_remaining_qty = self.get_position_qty(symbol)
             restore_result = self._restore_original_protection(
                 symbol=symbol,
@@ -1475,6 +1529,22 @@ class AlpacaClient:
                 "stop_price": None,
             }
         return {"ok": True, "order_id": None, "message": None, "stop_price": next(iter(stop_prices))}
+
+    def _lookup_order_by_client_id(self, client_order_id: str) -> tuple[Any, bool]:
+        """Return (order, reliable). A confirmed "not found" is (None, True); any other failure is (None, False)."""
+        client = self._client
+        if client is None or not hasattr(client, "get_order_by_client_id"):
+            return None, False
+        try:
+            order = client.get_order_by_client_id(client_order_id)
+        except Exception as exc:
+            status_code = getattr(exc, "status_code", None)
+            if status_code == 404 or "not found" in str(exc).lower():
+                return None, True
+            return None, False
+        if order is None:
+            return None, True
+        return order, True
 
     def _is_order_open(self, order_id: str, symbol: str) -> bool:
         for order in self.list_open_orders(symbol):

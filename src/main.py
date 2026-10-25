@@ -378,7 +378,15 @@ def _fractional_equity_positions(positions: list, symbol_type_map: Dict[str, str
         sym = _normalize_sym(str(getattr(pos, "symbol", "") or ""))
         if not sym:
             continue
-        asset_type = symbol_type_map.get(sym, "crypto" if "/" in sym else "stock")
+        # The broker's own asset class decides first: an unlisted crypto holding such as DOGEUSD
+        # must never fall through the symbol heuristic into the equity SELL path.
+        broker_class = _enum_value(getattr(pos, "asset_class", None))
+        if broker_class == "crypto":
+            continue
+        if broker_class == "us_equity":
+            asset_type = symbol_type_map.get(sym, "stock")
+        else:
+            asset_type = symbol_type_map.get(sym, "crypto" if "/" in sym else "stock")
         if asset_type not in {"stock", "etf"}:
             continue
         side = _enum_value(getattr(pos, "side", None)) or "long"
@@ -505,23 +513,36 @@ def run_eod_cleanup(
         )
 
     # ── portfolio state ────────────────────────────────────────────────────────
-    account = alpaca.get_account_snapshot()
     trades_today_count, traded_today = load_trade_activity(log_path, trading_day_value)
-    start_of_day_equity, _, _, _ = _build_daily_loss_state(previous_state, account.equity, trading_day_value, risk_config)
-    state = refresh_from_alpaca(
-        alpaca,
-        symbol_type_map,
-        {},
-        starting_balance=risk_config.portfolio_size,
-        trades_today=trades_today_count,
-        account_snapshot=account,
-    )
+    try:
+        account = alpaca.get_account_snapshot()
+        state = refresh_from_alpaca(
+            alpaca,
+            symbol_type_map,
+            {},
+            starting_balance=risk_config.portfolio_size,
+            trades_today=trades_today_count,
+            account_snapshot=account,
+        )
+        start_of_day_equity, _, _, _ = _build_daily_loss_state(previous_state, account.equity, trading_day_value, risk_config)
+    except Exception as exc:
+        # The cleanup outcome must be persisted even when the same broker outage breaks the
+        # account refresh; keep the previous balances (not re-verified) and record why.
+        failures.append(f"Broker account refresh failed after EOD cleanup, so balances were not re-verified: {exc}")
+        print(failures[-1])
+        state = PortfolioState.load(state_path)
+        state.starting_balance = risk_config.portfolio_size
+        state.trades_today = trades_today_count
+        state.last_updated = run_time.isoformat()
+        start_of_day_equity = state.start_of_day_equity if state.start_of_day_equity is not None else state.account_equity
     _carry_over_persisted_state(state, previous_state, trading_day_value)
     state.trading_day = trading_day_value
     state.traded_symbols_today = sorted(traded_today)
     state.max_total_exposure = risk_config.portfolio_size * (risk_config.max_total_exposure_percent / 100.0)
     state.mode = mode
-    if scheduled_run:
+    if scheduled_run and not failures:
+        # Only a cleanup that resolved every fractional position counts as done for the day;
+        # a failed scheduled run stays retryable while the exchange is still open.
         setattr(state, _scheduled_marker_field(mode), trading_day_value)
     _apply_final_daily_metrics(state, start_of_day_equity, risk_config)
     state.eod_cleanup_warnings = list(failures)
@@ -663,16 +684,25 @@ def run_once(
             # Stage into positions gradually to lower average cost over time.
             dca_position_value = max_position_value * 0.35
 
-        qty = _calc_qty(snapshot.last_price, asset_type, dca_position_value, allow_fractional=fractional_buy_sizing_allowed)
+        held_qty = held_qty_map.get(sym, 0.0)
+        holds_fractional_position = symbol_fractionable and uses_fractional_quantity(asset_type, held_qty)
+        # Sizing may be fractional for new BUYs under the threshold and, regardless of the
+        # threshold, for a symbol already held in a fractional quantity so a SELL can be sized
+        # to the real holding instead of flooring to a 0.0001-share exit.
+        qty = _calc_qty(
+            snapshot.last_price,
+            asset_type,
+            dca_position_value,
+            allow_fractional=fractional_buy_sizing_allowed or holds_fractional_position,
+        )
         decision = build_decision(signal, last_price=snapshot.last_price, default_qty=qty).to_dict()
         decision["requested_qty"] = decision.get("qty", qty)
         action = str(decision.get("action", "hold")).lower()
-        held_qty = held_qty_map.get(sym, 0.0)
         # SELL-to-close of an existing fractional position stays allowed even above the threshold.
         allow_fractional = (
             asset_type == "crypto"
             or fractional_buy_sizing_allowed
-            or (action == "sell" and symbol_fractionable and uses_fractional_quantity(asset_type, held_qty))
+            or (action == "sell" and holds_fractional_position)
         )
 
         risk_context = RiskEvaluationContext(

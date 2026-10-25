@@ -21,6 +21,10 @@ def _clock(is_open=True, minutes_to_close=120.0, now=_CLOCK_NOW):
     return SimpleNamespace(is_open=is_open, timestamp=now, next_close=now + timedelta(minutes=minutes_to_close))
 
 
+class _NotFound(Exception):
+    status_code = 404
+
+
 class RecordingTradingClient:
     def __init__(self, responses=None, open_orders=None, cancel_fail_ids=None, order_sequences=None, positions=None, fractionable=True, clock=None, clock_error=None, on_submit=None):
         self.responses = list(responses or [])
@@ -61,9 +65,19 @@ class RecordingTradingClient:
             response.side = getattr(order, "side", None)
         if getattr(response, "stop_price", None) is None and getattr(order, "stop_price", None) is not None:
             response.stop_price = getattr(order, "stop_price")
+        if getattr(response, "client_order_id", None) is None and getattr(order, "client_order_id", None) is not None:
+            response.client_order_id = getattr(order, "client_order_id")
 
         self._register(response)
         return response
+
+    def get_order_by_client_id(self, client_order_id):
+        if getattr(self, "client_lookup_error", None) is not None:
+            raise self.client_lookup_error
+        for order in self.lookup.values():
+            if getattr(order, "client_order_id", None) == client_order_id:
+                return order
+        raise _NotFound()
 
     def get_order_by_id(self, order_id, filter=None):
         sequence = self.order_sequences.get(str(order_id))
@@ -902,6 +916,9 @@ def test_fractional_entry_that_never_settles_fails_closed():
     assert client.cancelled_ids == ["entry-1"]
     assert len(client.orders) == 1
     assert "CRITICAL" in (result.message or "")
+    # The order may still fill, so it reserves its trade slot, cash and exposure.
+    assert result.counts_as_trade
+    assert result.protection_failed
 
 
 @_requires_alpaca_sdk
@@ -1151,3 +1168,117 @@ def test_close_position_for_eod_partial_fill_is_reported_as_incomplete_even_when
     assert result.protection_active
     assert result.replacement_protective_order_id == "stop-new"
     assert "expires at the close" in result.message
+
+
+# ── review follow-ups: entry/stop state handling ──────────────────────────────
+
+@_requires_alpaca_sdk
+def test_fractional_request_that_fills_to_whole_shares_gets_a_gtc_stop():
+    partial = _order(id="entry-1", symbol="AAPL", side="buy", status="partially_filled", filled_qty=1.0, filled_avg_price=347.0, order_class=None, legs=[])
+    settled = _order(id="entry-1", symbol="AAPL", side="buy", status="canceled", filled_qty=1.0, filled_avg_price=347.0, order_class=None, legs=[])
+    stop = _order(id="stop-1", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=1.0, time_in_force="gtc")
+    client = RecordingTradingClient([partial, stop], order_sequences={"entry-1": [partial, partial, partial, settled]})
+    alpaca = _alpaca(client, paper=True, entry_fill_poll_attempts=3, cancel_poll_attempts=5)
+
+    result = _fractional_buy(alpaca, qty=1.5)
+
+    assert result.success, result.message
+    assert client.orders[1].qty == 1.0
+    assert client.orders[1].time_in_force.value == "gtc"
+    assert result.protection_time_in_force == "gtc"
+    assert not result.requires_eod_exit
+    assert result.protection_active
+
+
+@_requires_alpaca_sdk
+def test_fractional_entry_cancel_is_sent_after_the_last_fill_poll():
+    pending = _order(id="entry-1", symbol="AAPL", side="buy", status="accepted", filled_qty=0.0, order_class=None, legs=[])
+    cancelled = _order(id="entry-1", symbol="AAPL", side="buy", status="canceled", filled_qty=0.0, order_class=None, legs=[])
+    client = RecordingTradingClient([pending], order_sequences={"entry-1": [pending, pending, cancelled]})
+    # One confirmation attempt is enough: the cancel goes out after the second (last) fill poll.
+    alpaca = _alpaca(client, paper=True, entry_fill_poll_attempts=2, cancel_poll_attempts=1)
+
+    result = _fractional_buy(alpaca)
+
+    assert client.cancelled_ids == ["entry-1"]
+    assert result.success
+    assert result.status == "entry_canceled_no_fill"
+    assert result.entry_poll_attempts == 3
+
+
+@_requires_alpaca_sdk
+def test_fractional_day_stop_is_not_confirmed_while_pending_new():
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="filled", filled_qty=0.0288, filled_avg_price=347.0, order_class=None, legs=[])
+    pending_stop = _order(id="stop-1", symbol="AAPL", side="sell", status="pending_new", stop_price=340.0, qty=0.0288, time_in_force="day")
+    rejected_stop = _order(id="stop-1", symbol="AAPL", side="sell", status="rejected", stop_price=340.0, qty=0.0288, time_in_force="day")
+    client = RecordingTradingClient([entry, pending_stop], order_sequences={"stop-1": [pending_stop, rejected_stop]})
+    alpaca = _alpaca(client, paper=True, stop_confirmation_poll_attempts=3)
+
+    result = _fractional_buy(alpaca)
+
+    assert not result.success
+    assert result.status == "protection_failed"
+    assert not result.protection_active
+
+    live_stop = _order(id="stop-2", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=0.0288, time_in_force="day")
+    client = RecordingTradingClient([entry, pending_stop], order_sequences={"stop-1": [pending_stop, live_stop]})
+    alpaca = _alpaca(client, paper=True, stop_confirmation_poll_attempts=3)
+    result = _fractional_buy(alpaca)
+    assert result.success and result.protection_active
+    assert result.stop_confirmation_poll_attempts == 2
+
+
+@_requires_alpaca_sdk
+def test_eod_sell_whose_submission_raised_but_was_accepted_is_recovered_not_double_protected():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    accepted_sell = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.03, filled_qty=0.03, filled_avg_price=350.0, status="filled", order_class=None, legs=[])
+    class TimeoutThenAcceptedClient(RecordingTradingClient):
+        def submit_order(self, order):
+            self.orders.append(order)
+            if len(self.orders) == 1:
+                accepted_sell.client_order_id = order.client_order_id
+                self._register(accepted_sell)
+                self.positions.clear()  # the broker filled the SELL even though the response was lost
+                raise TimeoutError("read timed out")
+            return super().submit_order(order)
+
+    client = TimeoutThenAcceptedClient(responses=[], open_orders=[day_stop], positions=[_order(symbol="AAPL", qty="0.03", side="long")])
+    alpaca = _alpaca(client, paper=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.03, "stock", current_position_qty=0.03)
+
+    assert result.success, result.message
+    assert result.filled_qty == 0.03
+    assert result.entry_order_id == "sell-1"
+    assert len(client.orders) == 1  # no restored stop on top of the live SELL
+
+
+@_requires_alpaca_sdk
+def test_eod_sell_submission_error_with_unreliable_lookup_fails_closed_without_a_stop():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    client = RecordingTradingClient(responses=[TimeoutError("read timed out")], open_orders=[day_stop], positions=[_order(symbol="AAPL", qty="0.03", side="long")])
+    client.client_lookup_error = RuntimeError("orders endpoint down")
+    alpaca = _alpaca(client, paper=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.03, "stock", current_position_qty=0.03)
+
+    assert not result.success
+    assert result.status == "critical_unprotected_position"
+    assert "NOT restored" in result.message
+    assert len(client.orders) == 1
+    assert result.cancelled_protective_order_ids == ["stop-day"]
+
+
+@_requires_alpaca_sdk
+def test_sell_submission_error_confirmed_not_accepted_still_restores_protection():
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    restored = _order(id="stop-restored", symbol="AAPL", side="sell", qty=0.03, stop_price=340.0, status="new", time_in_force="day")
+    client = RecordingTradingClient(responses=[RuntimeError("rejected by broker"), restored], open_orders=[day_stop], positions=[_order(symbol="AAPL", qty="0.03", side="long")])
+    alpaca = _alpaca(client, paper=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.03, "stock", current_position_qty=0.03)
+
+    assert not result.success
+    assert result.status == "sell_failed_protection_restored"
+    assert result.restored_protective_order_id == "stop-restored"
+    assert client.orders[1].time_in_force.value == "day"

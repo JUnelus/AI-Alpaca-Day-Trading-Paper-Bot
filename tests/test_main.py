@@ -989,7 +989,7 @@ def test_eod_mode_refuses_to_sell_when_the_session_is_closed_or_the_clock_is_unu
         _run_eod(alpaca, paths)
 
     state = PortfolioState.load(str(paths[4]))
-    assert state.last_scheduled_eod_day == "2026-08-27"
+    assert state.last_scheduled_eod_day == ""  # a failed cleanup stays retryable
     assert len(state.eod_cleanup_warnings) == 1
     assert "EOD cleanup failed for AAPL" in state.eod_cleanup_warnings[0]
     assert state.eod_cleanup_warnings[0] in state.warnings
@@ -1020,9 +1020,18 @@ def test_eod_mode_exit_failure_raises_after_persisting_state_and_log(tmp_path):
 
     state = PortfolioState.load(str(paths[4]))
     assert state.mode == "eod"
+    assert state.last_scheduled_eod_day == ""
     assert any("did not reach a terminal state" in w for w in state.warnings)
     assert "critical_unprotected_position" in paths[1].read_text(encoding="utf-8")
     assert "⚠️ PROTECTION FAILED" in paths[2].read_text(encoding="utf-8")
+
+    # A scheduled retry the same day is still allowed and can finish the job.
+    retry = DummyAlpacaClient(positions=_eod_positions())
+    _run_eod(retry, paths, now=_EOD_NOW + timedelta(minutes=3))
+    assert len(retry.eod_calls) == 1
+    retried_state = PortfolioState.load(str(paths[4]))
+    assert retried_state.last_scheduled_eod_day == "2026-08-27"
+    assert retried_state.eod_cleanup_warnings == []
 
 
 def test_eod_mode_position_listing_failure_raises_instead_of_reading_flat(tmp_path):
@@ -1090,7 +1099,7 @@ def test_eod_cleanup_warnings_surface_on_same_day_report_and_expire_next_day(mon
 
     same_day = report(_EOD_NOW + timedelta(minutes=35))
     assert any("EOD cleanup failed for AAPL" in w for w in same_day["portfolio"]["warnings"])
-    assert PortfolioState.load(str(state_path)).last_scheduled_eod_day == "2026-08-27"
+    assert PortfolioState.load(str(state_path)).last_scheduled_eod_day == ""
 
     next_day = report(_EOD_NOW + timedelta(days=1))
     assert not any("EOD cleanup failed" in w for w in next_day["portfolio"]["warnings"])
@@ -1103,3 +1112,51 @@ def test_parse_args_accepts_eod_mode():
     assert args.scheduled_run
     with pytest.raises(SystemExit):
         parse_args(["--mode", "cleanup"])
+
+
+def test_eod_mode_uses_broker_asset_class_before_symbol_heuristics(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    doge = _position("DOGEUSD", 12.5)
+    doge.asset_class = "crypto"
+    unlisted_equity = _position("NVDA", 0.25)
+    unlisted_equity.asset_class = SimpleNamespace(value="us_equity")
+    alpaca = DummyAlpacaClient(positions=[doge, unlisted_equity, _position("AAPL", 0.0288)])
+
+    _run_eod(alpaca, paths)
+
+    assert sorted(call["symbol"] for call in alpaca.eod_calls) == ["AAPL", "NVDA"]
+
+
+def test_eod_mode_persists_failures_even_when_the_account_refresh_breaks(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    failure = ExecutionResult(success=False, symbol="AAPL", side="sell", requested_qty=0.0288, status="critical_unprotected_position", message="CRITICAL: ambiguous", asset_type="stock", protection_failed=True, eod_exit=True)
+    alpaca = DummyAlpacaClient(positions=_eod_positions(), eod_results=[failure])
+    alpaca.get_account_snapshot = lambda: (_ for _ in ()).throw(RuntimeError("account endpoint down"))
+
+    with pytest.raises(EodCleanupError, match="ambiguous"):
+        _run_eod(alpaca, paths)
+
+    state = PortfolioState.load(str(paths[4]))
+    assert any("ambiguous" in w for w in state.eod_cleanup_warnings)
+    assert any("account endpoint down" in w for w in state.eod_cleanup_warnings)
+    assert state.last_scheduled_eod_day == ""
+
+
+def test_sell_of_a_fractional_holding_is_sized_to_the_holding_above_the_threshold(monkeypatch, tmp_path):
+    symbols = [{"symbol": "AAPL", "name": "Apple", "type": "stock", "quality_score": 0.9}]
+    watchlist_path, log_path, summary_path, readme_path, state_path = _prepare_paths(tmp_path, symbols)
+    # Equity far above the fractional threshold: new BUYs would be whole-share only.
+    alpaca = DummyAlpacaClient(positions=[_position("AAPL", 0.0288, price=347.0)], account=AccountSnapshot(equity=100_000.0, cash=90_000.0, buying_power=90_000.0))
+
+    monkeypatch.setenv("PORTFOLIO_SIZE", "100")  # $10 per-symbol cap: whole-share sizing floors to zero
+    monkeypatch.setattr("src.main.refresh_weekly_watchlist", lambda *args, **kwargs: False)
+    monkeypatch.setattr("src.main.send_daily_report", lambda *args, **kwargs: True)
+    monkeypatch.setattr("src.main.get_market_snapshots", lambda *args, **kwargs: MarketDataResult(snapshots={"AAPL": _fresh_snapshot("AAPL", day_change=3.0, price=347.0), **_benchmarks()}, service_available=True, used_fallback_data=False))
+    monkeypatch.setattr("src.main.generate_signal", lambda snapshot, cfg, market_context=None: StrategySignal(symbol="AAPL", action="sell", strength=0.9, reason="take profit"))
+
+    result = run_once(mode="trade", watchlist_path=str(watchlist_path), log_path=str(log_path), summary_path=str(summary_path), readme_path=str(readme_path), state_path=str(state_path), now=datetime(2026, 8, 27, 14, 0, tzinfo=timezone.utc), alpaca_client=alpaca)
+
+    assert len(alpaca.calls) == 1
+    assert alpaca.calls[0]["side"] == "sell"
+    assert alpaca.calls[0]["qty"] == 0.0288
+    assert result["results"][0]["decision"]["requested_qty"] == 0.0288
