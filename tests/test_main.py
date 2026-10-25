@@ -7,7 +7,7 @@ import pytest
 
 from src.alpaca_client import AccountSnapshot, BrokerAsset
 from src.execution_models import ExecutionResult
-from src.main import ConfigurationError, EodCleanupError, apply_execution_to_available_cash, parse_args, run_once
+from src.main import ConfigurationError, EodCleanupError, _apply_execution_to_position_state, apply_execution_to_available_cash, parse_args, run_once
 from src.market_data import MarketDataResult
 from src.portfolio import PortfolioState
 from src.strategy import MarketSnapshot, StrategySignal
@@ -188,6 +188,27 @@ def test_apply_execution_to_available_cash_handles_buy_and_sell_correctly():
 
     assert apply_execution_to_available_cash(1_000.0, buy_result, 100.0) == 800.0
     assert apply_execution_to_available_cash(1_000.0, sell_result, 100.0) == 1_200.0
+
+
+def test_ambiguous_partial_entry_reserves_the_full_requested_quantity():
+    ambiguous = ExecutionResult(
+        success=False, symbol="AAPL", side="buy", requested_qty=0.9, filled_qty=0.1, filled_avg_price=100.0,
+        counts_as_trade=True, protection_failed=True, status="entry_state_ambiguous",
+    )
+    # The unfilled 0.8 may still execute, so cash and exposure reserve all 0.9 shares, not the 0.1 filled.
+    assert apply_execution_to_available_cash(1_000.0, ambiguous, 100.0) == 910.0
+
+    held, values = {}, {}
+    exposure = _apply_execution_to_position_state("AAPL", ambiguous, 100.0, held, values, 0.0)
+    assert exposure == 90.0
+    assert held["AAPL"] == 0.9
+    assert values["AAPL"] == 90.0
+
+    settled_partial = ExecutionResult(
+        success=True, symbol="AAPL", side="buy", requested_qty=0.9, filled_qty=0.1, filled_avg_price=100.0,
+        counts_as_trade=True, status="canceled",
+    )
+    assert apply_execution_to_available_cash(1_000.0, settled_partial, 100.0) == 990.0
 
 
 def test_trade_mode_can_reach_order_execution_layer(monkeypatch, tmp_path):

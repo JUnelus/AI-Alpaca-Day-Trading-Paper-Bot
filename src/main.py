@@ -74,6 +74,17 @@ def _calc_qty(price: float, asset_type: str, max_position_value: float, allow_fr
     return qty
 
 
+def _reserved_buy_qty(execution_result: ExecutionResult) -> float:
+    """Quantity a BUY must reserve against cash and exposure.
+
+    An entry whose cancellation could not be confirmed may still fill its unfilled remainder,
+    so it reserves the full requested quantity even when part of it has already filled.
+    """
+    if execution_result.status == "entry_state_ambiguous":
+        return max(execution_result.requested_qty, execution_result.filled_qty)
+    return execution_result.filled_qty if execution_result.filled_qty > 0 else execution_result.requested_qty
+
+
 def apply_execution_to_available_cash(
     available_cash: float,
     execution_result: ExecutionResult,
@@ -84,7 +95,7 @@ def apply_execution_to_available_cash(
 
     unit_price = execution_result.filled_avg_price or reference_price
     if execution_result.side == "buy":
-        effective_qty = execution_result.filled_qty if execution_result.filled_qty > 0 else execution_result.requested_qty
+        effective_qty = _reserved_buy_qty(execution_result)
         return max(0.0, available_cash - unit_price * effective_qty)
 
     if execution_result.side == "sell" and execution_result.filled_qty > 0:
@@ -108,7 +119,7 @@ def _apply_execution_to_position_state(
     tracked_qty = held_qty_map.get(symbol, 0.0)
 
     if execution_result.side == "buy":
-        effective_qty = execution_result.filled_qty if execution_result.filled_qty > 0 else execution_result.requested_qty
+        effective_qty = _reserved_buy_qty(execution_result)
         value_delta = reference_price * effective_qty
         held_qty_map[symbol] = tracked_qty + effective_qty
         position_value_map[symbol] = tracked_value + value_delta
