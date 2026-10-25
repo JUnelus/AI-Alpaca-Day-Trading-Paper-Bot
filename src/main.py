@@ -382,9 +382,20 @@ def _enum_value(value) -> Optional[str]:
     return str(raw).lower()
 
 
-def _fractional_equity_positions(positions: list, symbol_type_map: Dict[str, str]) -> list[dict]:
-    """Long stock/ETF holdings with a fractional quantity; their DAY stops expire at the close."""
+def _fractional_equity_positions(
+    positions: list,
+    symbol_type_map: Dict[str, str],
+    has_day_protection=None,
+) -> tuple[list[dict], list[dict]]:
+    """Long stock/ETF holdings whose protection expires at the close.
+
+    A fractional quantity always qualifies. A whole-share holding qualifies too when any of its
+    open protective stops is a DAY order (a fractional top-up can turn 0.65 + 0.35 held into an
+    integer position that still carries DAY protection). Returns ``(candidates, lookup_errors)``;
+    a holding whose protection could not be verified is an error, never a silent exclusion.
+    """
     candidates: list[dict] = []
+    lookup_errors: list[dict] = []
     for pos in positions:
         sym = _normalize_sym(str(getattr(pos, "symbol", "") or ""))
         if not sym:
@@ -402,7 +413,20 @@ def _fractional_equity_positions(positions: list, symbol_type_map: Dict[str, str
             continue
         side = _enum_value(getattr(pos, "side", None)) or "long"
         qty = _safe_float(getattr(pos, "qty", 0.0))
-        if side != "long" or qty <= 0 or not uses_fractional_quantity(asset_type, qty):
+        if side != "long" or qty <= 0:
+            continue
+        if uses_fractional_quantity(asset_type, qty):
+            reason = "fractional quantity"
+        elif has_day_protection is not None:
+            try:
+                expiring = bool(has_day_protection(sym))
+            except Exception as exc:
+                lookup_errors.append({"symbol": sym, "asset_type": asset_type, "qty": qty, "error": str(exc)})
+                continue
+            if not expiring:
+                continue
+            reason = "whole-share holding protected by a DAY stop"
+        else:
             continue
         candidates.append(
             {
@@ -410,9 +434,10 @@ def _fractional_equity_positions(positions: list, symbol_type_map: Dict[str, str
                 "asset_type": asset_type,
                 "qty": qty,
                 "price": _safe_float(getattr(pos, "current_price", 0.0)),
+                "reason": reason,
             }
         )
-    return candidates
+    return candidates, lookup_errors
 
 
 def run_eod_cleanup(
@@ -471,11 +496,16 @@ def run_eod_cleanup(
     # A listing failure must not read as "flat": it raises and fails the job instead.
     positions = alpaca.list_positions_strict()
     symbol_type_map = {s["symbol"]: s["type"] for s in symbols}
-    candidates = _fractional_equity_positions(positions, symbol_type_map)
+    candidates, lookup_errors = _fractional_equity_positions(positions, symbol_type_map, alpaca.has_day_protection)
     blocked_reason = None if window["state"] == "in_window" else window["message"]
 
     results: list[dict] = []
     failures: list[str] = []
+    for unverified in lookup_errors:
+        failures.append(
+            f"EOD cleanup could not verify protection for {unverified['symbol']} ({unverified['qty']:g} shares): {unverified['error']}"
+        )
+        print(failures[-1])
     for candidate in candidates:
         sym = candidate["symbol"]
         qty = candidate["qty"]
@@ -487,9 +517,9 @@ def run_eod_cleanup(
             "requested_qty": qty,
             "stop_loss": None,
             "max_risk_percent": None,
-            "reason": "EOD cleanup: fractional stock/ETF position whose DAY protective stop expires at the close.",
+            "reason": f"EOD cleanup: stock/ETF position whose DAY protective stop expires at the close ({candidate['reason']}).",
         }
-        notes = [f"EOD cleanup window: {window['state']}"]
+        notes = [f"EOD cleanup window: {window['state']}", f"Eligibility: {candidate['reason']}"]
         if blocked_reason:
             order_result = ExecutionResult(
                 success=False,

@@ -414,20 +414,11 @@ class AlpacaClient:
             time_in_force=TimeInForce.GTC,
             order_class=OrderClass.OTO,
             stop_loss=StopLossRequest(stop_price=stop_loss),
+            client_order_id=self._new_client_order_id("buy", symbol),
         )
-        try:
-            submitted_order = client.submit_order(order)
-        except Exception as exc:
-            return ExecutionResult(
-                success=False,
-                symbol=symbol,
-                side="buy",
-                requested_qty=qty,
-                status="error",
-                message=str(exc),
-                asset_type=asset_type,
-                stop_price=stop_loss,
-            )
+        submitted_order, recovery_failure = self._submit_buy_or_recover(order, symbol, qty, stop_loss, asset_type)
+        if recovery_failure is not None:
+            return recovery_failure
 
         confirmation = self._poll_for_attached_stop(
             order_id=self._order_identifier(submitted_order),
@@ -537,22 +528,13 @@ class AlpacaClient:
             qty=qty,
             side=OrderSide.BUY,
             time_in_force=TimeInForce.DAY,
+            client_order_id=self._new_client_order_id("buy", symbol),
         )
-        try:
-            submitted_entry = client.submit_order(entry_order)
-        except Exception as exc:
-            return ExecutionResult(
-                success=False,
-                symbol=symbol,
-                side="buy",
-                requested_qty=qty,
-                status="error",
-                message=str(exc),
-                stop_price=stop_loss,
-                asset_type=asset_type,
-                protection_time_in_force=protection_tif,
-                requires_eod_exit=requires_eod_exit,
-            )
+        submitted_entry, recovery_failure = self._submit_buy_or_recover(entry_order, symbol, qty, stop_loss, asset_type)
+        if recovery_failure is not None:
+            recovery_failure.protection_time_in_force = protection_tif
+            recovery_failure.requires_eod_exit = requires_eod_exit
+            return recovery_failure
 
         entry_order_id = self._order_identifier(submitted_entry)
         if requires_eod_exit:
@@ -1529,6 +1511,74 @@ class AlpacaClient:
                 "stop_price": None,
             }
         return {"ok": True, "order_id": None, "message": None, "stop_price": next(iter(stop_prices))}
+
+    def _new_client_order_id(self, purpose: str, symbol: str) -> str:
+        return f"paper-{purpose}-{self._normalize_symbol(symbol).lower()}-{uuid.uuid4().hex[:12]}"
+
+    def _submit_buy_or_recover(self, order, symbol: str, qty: float, stop_loss: float, asset_type: str) -> tuple[Any, Optional[ExecutionResult]]:
+        """Submit a BUY; if the call raises, find out whether the broker accepted it before giving up.
+
+        Returns ``(order, None)`` when the submission (or its recovery by client order ID)
+        produced a broker order, or ``(None, failure)`` otherwise: a confirmed "not found" is a
+        plain error, while an unverifiable state is a counted, unprotected ambiguous entry so the
+        run reserves its capacity and reports the exposure instead of treating it as never sent.
+        """
+        client = self._client
+        try:
+            return client.submit_order(order), None
+        except Exception as exc:
+            client_order_id = getattr(order, "client_order_id", None) or ""
+            recovered, reliable = self._lookup_order_by_client_id(client_order_id)
+            if recovered is not None:
+                return recovered, None
+            if reliable:
+                return None, ExecutionResult(
+                    success=False,
+                    symbol=symbol,
+                    side="buy",
+                    requested_qty=qty,
+                    status="error",
+                    message=str(exc),
+                    asset_type=asset_type,
+                    stop_price=stop_loss,
+                )
+            message = (
+                f"CRITICAL: BUY submission for {symbol} raised ({exc}) and the broker could not confirm whether "
+                f"order {client_order_id} exists; it may fill without protection and is counted as an open exposure."
+            )
+            print(message)
+            return None, ExecutionResult(
+                success=False,
+                symbol=symbol,
+                side="buy",
+                requested_qty=qty,
+                protection_active=False,
+                protection_failed=True,
+                counts_as_trade=True,
+                status="entry_state_ambiguous",
+                message=message,
+                asset_type=asset_type,
+                stop_price=stop_loss,
+            )
+
+    def has_day_protection(self, symbol: str) -> bool:
+        """True when any open protective stop for ``symbol`` is a DAY order that expires at the close.
+
+        Raises when open orders cannot be listed, so cleanup eligibility is never decided on a
+        silently empty order list.
+        """
+        if not self._client or not GetOrdersRequest or not QueryOrderStatus:
+            raise RuntimeError("Alpaca open-order listing is unavailable.")
+        order_filter = GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True, symbols=[symbol])
+        for order in list(self._client.get_orders(order_filter)):
+            for candidate in self._iter_order_candidates(order):
+                if self._normalize_symbol(getattr(candidate, "symbol", "")) != self._normalize_symbol(symbol):
+                    continue
+                if self._side_value(candidate) != "sell" or not self._is_protective_stop(candidate):
+                    continue
+                if self._time_in_force_value(candidate) == "day":
+                    return True
+        return False
 
     def _lookup_order_by_client_id(self, client_order_id: str) -> tuple[Any, bool]:
         """Return (order, reliable). A confirmed "not found" is (None, True); any other failure is (None, False)."""

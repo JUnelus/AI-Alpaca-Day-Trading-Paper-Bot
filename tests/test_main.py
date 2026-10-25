@@ -14,10 +14,13 @@ from src.strategy import MarketSnapshot, StrategySignal
 
 
 class DummyAlpacaClient:
-    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True, fractionable=True, eod_window="in_window", eod_results=None, positions_error=None):
+    def __init__(self, execution_results=None, positions=None, account=None, account_snapshots=None, fail_on_place=False, paper=True, fractionable=True, eod_window="in_window", eod_results=None, positions_error=None, day_protected=None, protection_lookup_errors=None):
         self.paper = paper
         self.fractionable = fractionable
         self.eod_window = eod_window
+        self.day_protected = set(day_protected or [])
+        self.protection_lookup_errors = dict(protection_lookup_errors or {})
+        self.protection_lookups = []
         self._eod_results = list(eod_results or [])
         self.positions_error = positions_error
         self.eod_calls = []
@@ -43,6 +46,12 @@ class DummyAlpacaClient:
         if self.positions_error is not None:
             raise self.positions_error
         return list(self._positions)
+
+    def has_day_protection(self, symbol):
+        self.protection_lookups.append(symbol)
+        if symbol in self.protection_lookup_errors:
+            raise self.protection_lookup_errors[symbol]
+        return symbol in self.day_protected
 
     def eod_cleanup_window(self):
         messages = {
@@ -953,6 +962,7 @@ def test_eod_mode_sells_only_long_fractional_equity_positions(monkeypatch, tmp_p
 
     assert result["mode"] == "eod"
     assert [call["symbol"] for call in alpaca.eod_calls] == ["AAPL"]
+    assert alpaca.protection_lookups == ["MSFT"]  # only whole-share equities need an order lookup
     assert alpaca.eod_calls[0] == {"symbol": "AAPL", "qty": 0.0288, "asset_type": "stock", "current_position_qty": 0.0288}
     assert alpaca.calls == []  # never routed through the strategy order path
     assert result["results"][0]["order_result"]["eod_exit"]
@@ -1181,3 +1191,33 @@ def test_sell_of_a_fractional_holding_is_sized_to_the_holding_above_the_threshol
     assert alpaca.calls[0]["side"] == "sell"
     assert alpaca.calls[0]["qty"] == 0.0288
     assert result["results"][0]["decision"]["requested_qty"] == 0.0288
+
+
+def test_eod_mode_sells_whole_share_holdings_whose_protection_is_a_day_stop(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    # 0.65 left by a failed cleanup + a 0.35 top-up = an integer holding still protected by DAY stops.
+    alpaca = DummyAlpacaClient(positions=[_position("MSFT", 1.0), _position("AAPL", 2.0)], day_protected={"MSFT"})
+
+    result = _run_eod(alpaca, paths)
+
+    assert [call["symbol"] for call in alpaca.eod_calls] == ["MSFT"]
+    assert alpaca.eod_calls[0]["qty"] == 1.0
+    assert "whole-share holding protected by a DAY stop" in result["results"][0]["decision"]["reason"]
+    assert PortfolioState.load(str(paths[4])).last_scheduled_eod_day == "2026-08-27"
+
+
+def test_eod_mode_treats_an_unverifiable_protection_lookup_as_a_failure(tmp_path):
+    paths = _prepare_paths(tmp_path, _EOD_SYMBOLS)
+    alpaca = DummyAlpacaClient(
+        positions=[_position("MSFT", 1.0), _position("AAPL", 0.0288)],
+        protection_lookup_errors={"MSFT": RuntimeError("orders endpoint down")},
+    )
+
+    with pytest.raises(EodCleanupError, match="could not verify protection for MSFT"):
+        _run_eod(alpaca, paths)
+
+    # The verifiable fractional position was still exited; only the unverified one failed the run.
+    assert [call["symbol"] for call in alpaca.eod_calls] == ["AAPL"]
+    state = PortfolioState.load(str(paths[4]))
+    assert state.last_scheduled_eod_day == ""
+    assert any("orders endpoint down" in w for w in state.eod_cleanup_warnings)

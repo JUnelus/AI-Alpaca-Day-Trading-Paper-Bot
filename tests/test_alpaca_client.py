@@ -1282,3 +1282,80 @@ def test_sell_submission_error_confirmed_not_accepted_still_restores_protection(
     assert result.status == "sell_failed_protection_restored"
     assert result.restored_protective_order_id == "stop-restored"
     assert client.orders[1].time_in_force.value == "day"
+
+
+# ── review follow-ups: BUY submission recovery and DAY-protection discovery ───
+
+@_requires_alpaca_sdk
+def test_fractional_buy_whose_submission_raised_but_was_accepted_is_recovered_and_protected():
+    entry = _order(id="entry-1", symbol="AAPL", side="buy", status="filled", filled_qty=0.0288, filled_avg_price=347.0, order_class=None, legs=[])
+    stop = _order(id="stop-1", symbol="AAPL", side="sell", status="new", stop_price=340.0, qty=0.0288, time_in_force="day")
+
+    class TimeoutThenAcceptedClient(RecordingTradingClient):
+        def submit_order(self, order):
+            if len(self.orders) == 0:
+                self.orders.append(order)
+                entry.client_order_id = order.client_order_id
+                self._register(entry)
+                raise TimeoutError("read timed out")
+            return super().submit_order(order)
+
+    client = TimeoutThenAcceptedClient([stop])
+    alpaca = _alpaca(client, paper=True)
+
+    result = _fractional_buy(alpaca)
+
+    assert result.success, result.message
+    assert result.entry_order_id == "entry-1"
+    assert result.protection_active and result.protective_order_id == "stop-1"
+    assert client.orders[0].client_order_id.startswith("paper-buy-aapl-")
+
+
+@_requires_alpaca_sdk
+def test_buy_submission_error_with_unreliable_lookup_is_a_counted_ambiguous_entry():
+    for prefer_attached, qty in ((True, 1.0), (True, 0.0288)):
+        client = RecordingTradingClient([TimeoutError("read timed out")])
+        client.client_lookup_error = RuntimeError("orders endpoint down")
+        alpaca = _alpaca(client, paper=True, prefer_attached_stops=prefer_attached)
+
+        result = _fractional_buy(alpaca, qty=qty)
+
+        assert not result.success
+        assert result.status == "entry_state_ambiguous"
+        assert result.counts_as_trade and result.protection_failed
+        assert "could not confirm" in result.message
+        assert len(client.orders) == 1
+
+
+@_requires_alpaca_sdk
+def test_buy_submission_error_confirmed_not_accepted_is_a_plain_error():
+    client = RecordingTradingClient([RuntimeError("insufficient buying power")])
+    alpaca = _alpaca(client, paper=True)
+
+    result = _fractional_buy(alpaca, qty=1.0)
+
+    assert not result.success
+    assert result.status == "error"
+    assert not result.counts_as_trade
+    assert "insufficient buying power" in result.message
+
+
+@_requires_alpaca_sdk
+def test_has_day_protection_detects_expiring_stops_and_raises_on_listing_errors():
+    day_stop = _order(id="stop-day", symbol="MSFT", side="sell", qty=1.0, stop_price=400.0, status="new", time_in_force="day", type="stop")
+    gtc_stop = _order(id="stop-gtc", symbol="AAPL", side="sell", qty=1.0, stop_price=340.0, status="new", time_in_force="gtc", type="stop")
+    client = RecordingTradingClient([], open_orders=[day_stop, gtc_stop])
+    alpaca = _alpaca(client, paper=True)
+
+    assert alpaca.has_day_protection("MSFT")
+    assert not alpaca.has_day_protection("AAPL")
+    assert not alpaca.has_day_protection("NVDA")
+
+    class BrokenOrders(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            raise RuntimeError("orders endpoint down")
+
+    with pytest.raises(RuntimeError, match="orders endpoint down"):
+        _alpaca(BrokenOrders([]), paper=True).has_day_protection("MSFT")
+    with pytest.raises(RuntimeError):
+        AlpacaClient(trading_client=None, paper=True).has_day_protection("MSFT")
