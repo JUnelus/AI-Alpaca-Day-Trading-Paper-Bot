@@ -80,12 +80,14 @@ ai-alpaca-day-trading-paper-bot/
 | Portfolio budget | `PORTFOLIO_SIZE=100` — matches the live bot's dynamic strategy capital (50% of its $200 live account) |
 | Max position size | `MAX_POSITION_PERCENT=10` (default $10 per symbol) |
 | Max total gross exposure | `MAX_TOTAL_EXPOSURE_PERCENT=80` (default $80) |
+| Fractional equity sizing | `FRACTIONAL_EQUITY_THRESHOLD=20000`: stock/ETF BUYs may be sized in fractional shares while account equity is below this and Alpaca marks the asset fractionable |
+| Fractional DAY-stop cleanup | `FRACTIONAL_EOD_WINDOW_MINUTES=30`: the scheduled `eod` run market-sells every fractional stock/ETF position inside this pre-close window, and new fractional BUYs are refused inside it |
 | Daily trade cap | `MAX_DAILY_TRADES=3` across the whole bot |
 | Per-symbol trade cap | Max 1 executed trade per symbol per trading day |
 | Daily loss circuit breaker | `MAX_DAILY_LOSS_PERCENT=2` blocks new BUYs after the threshold is hit |
 | Margin | `ALLOW_MARGIN=false` |
 | Shorts | `ALLOW_SHORTS=false` |
-| Protective stop policy | New long stock/ETF BUYs must have broker-side `GTC` broker-side stop protection or the entry is rejected |
+| Protective stop policy | New long stock/ETF BUYs must have broker-side stop protection or the entry is rejected: `GTC` for whole-share entries, `DAY` for fractional entries (Alpaca's only option) |
 | Crypto BUY safety | Rejected whenever reliable broker-side protective stops cannot be guaranteed |
 | Market-data safety | Fallback/demo prices are **never** eligible for paper-order execution |
 | Scheduled automation idempotency | Scheduled trade/report runs persist once-per-Eastern-trading-day markers |
@@ -105,15 +107,40 @@ ALLOW_MARGIN=false
 ALLOW_SHORTS=false
 MIN_CONFIDENCE=0.70
 MAX_RISK_PERCENT=1
+FRACTIONAL_EQUITY_THRESHOLD=20000
+FRACTIONAL_EOD_WINDOW_MINUTES=30
 ```
+
+### Fractional Equity Policy
+
+- New **stock/ETF BUY** sizing may use Alpaca-supported fractional quantities (4 decimal places) only when account equity is below `FRACTIONAL_EQUITY_THRESHOLD` (default `$20,000`) **and** Alpaca reports the asset as fractionable.
+- This is what lets a small budget trade at all: with `PORTFOLIO_SIZE=100` the per-symbol cap is `$10`, so a `$347` stock is sized to `0.0288` shares instead of being floored to zero.
+- At or above the threshold, new equity BUY quantities are floored to whole shares exactly as before. Crypto precision is unaffected by this policy.
+- Existing fractional positions remain eligible for **SELL-to-close** handling regardless of the threshold.
+- If the broker asset lookup fails, the asset is treated as **not fractionable** and a fractional BUY is rejected (fail closed).
 
 ### Protective Stop Behavior
 
-- For new long **stock/ETF BUY** orders, the bot submits broker-side protection through Alpaca-supported attached stop logic using **`GTC`** protection so the stop can persist beyond the current session.
+- For new long whole-share **stock/ETF BUY** orders, the bot submits broker-side protection through Alpaca-supported attached stop logic using **`GTC`** protection so the stop can persist beyond the current session.
+- Alpaca only accepts fractional equity orders as simple **`DAY`** market orders, so a fractional BUY is placed as a DAY market entry followed by a standalone **`DAY`** stop sized to the verified fill. The entry is given a bounded fill window, any unfilled remainder is cancelled before the stop is sized, and the stop is confirmed with bounded broker polling. That DAY stop **expires at the close**, so fractional positions are never held overnight: the scheduled end-of-day cleanup below exits them first.
+- A fractional BUY is **refused inside the pre-close window** (`FRACTIONAL_EOD_WINDOW_MINUTES`, default 30), when the exchange is closed, or when Alpaca's market clock cannot be read, because no later cleanup run would exist to exit its expiring DAY stop.
+- If a fractional request happens to fill to a **whole-share** quantity before its remainder is cancelled, that fill gets a normal **`GTC`** stop instead of a DAY stop, so it never depends on the cleanup. A fractional entry whose cancellation cannot be confirmed is treated as a counted trade that reserves its full cash, exposure and daily-trade slot, because it may still fill.
 - Attached OTO protection is only treated as active after bounded polling confirms an actual stop child with a valid child order ID, stop price, side, and quantity.
 - If the bot cannot reliably create that protective stop, it **rejects the BUY** instead of placing an unprotected entry.
 - If an entry is accepted/executed but protection confirmation fails, the run records a **critical protection failure** and does not treat the trade as safely protected.
 - Normal long **SELL-to-close** orders do not create a new entry-style stop.
+
+### End-of-Day Fractional Cleanup (`--mode eod`)
+
+- A fourth scheduled run (`python -m src.main --mode eod --scheduled-run`, 3:40 PM America/New_York, plus a 12:40 PM run that only acts on early-close days) **market-sells every long fractional stock/ETF position** before its DAY protective stop expires at the close. Whole-share positions keep their GTC stops and crypto is untouched.
+- The run consults **Alpaca's market clock**, never the runner's wall clock: before the pre-close window it is a no-op (so the 12:40 run skips on a normal day and writes no once-per-day marker); when the session is already closed or the clock is unusable it refuses to sell, records the failure, and fails the job.
+- The once-per-day marker is written **only when every fractional position was resolved**, so a failed scheduled cleanup can be re-run (re-run the job or dispatch `eod` manually) while the exchange is still open.
+- Candidates are chosen by the broker's own asset class first (crypto is skipped even for unlisted symbols such as `DOGEUSD`), then the watchlist type, then the symbol. A fractional quantity always qualifies; a whole-share holding qualifies when any of its open protective stops is a DAY order (a fractional top-up can turn 0.65 + 0.35 into an integer holding that still carries DAY protection). A holding whose stops cannot be listed is a failure, never a silent exclusion.
+- For each position it **cancels and verifies the DAY stop first**, submits a DAY market SELL, gives it a bounded fill window, and if it has not filled, cancels it and confirms a terminal broker state **before** any protection is restored. A SELL whose state stays ambiguous is reported as a critical unprotected position and never has a stop stacked on top of it.
+- Every BUY and SELL carries a client order ID. If the submission call raises (for example a response timeout) the bot looks the order up by that ID: an accepted order is recovered and handled normally (a BUY goes on to get its stop, a SELL is reconciled); a confirmed "not found" is a plain error (and restores the original stop for a SELL); an unreliable lookup fails closed, as a counted ambiguous entry for a BUY or with no stop added for a SELL.
+- Position discovery is strict: a broker listing error raises instead of reading as "no positions".
+- A residual quantity after a partial fill is re-protected with a fresh DAY stop but still reported as a failure, because that stop expires at the close too.
+- Exits are written to the trade log, the daily summary (`EOD Cleanup Exits`) and the dashboard; they are safety exits and are not subject to `MAX_DAILY_TRADES`. Any failure is persisted in `portfolio_state.json`, surfaces as a safety warning on the same day's 4:15 PM report, and fails the GitHub Actions job so it is visible. The next day's cleanup sweeps any fractional position that was left behind.
 
 ### Protective Stop Reconciliation on SELL
 
@@ -181,15 +208,16 @@ daily_pnl = final account equity - start_of_day_equity
      - **never** places broker orders
    - `.github/workflows/daily_trade.yml`
       - scheduled morning run: `python -m src.main --mode trade --scheduled-run`
+      - scheduled pre-close run: `python -m src.main --mode eod --scheduled-run` (fractional DAY-stop cleanup)
       - scheduled afternoon run: `python -m src.main --mode report --scheduled-run`
      - manual runs require an explicit mode choice and default to `report`
      - every bot run forces `ALPACA_PAPER=true`
       - state-mutating bot runs are serialized with GitHub Actions concurrency (`alpaca-paper-trading-bot`)
       - state commit steps still run after bot-step failures, so email issues cannot prevent execution-state commits
       - native GitHub schedule timezone is `America/New_York`
-      - scheduled trade/report runs use persisted once-per-trading-day markers so accidental reruns become no-ops
+      - scheduled trade/eod/report runs use persisted once-per-trading-day markers so accidental reruns become no-ops
 
-> The scheduled workflow runs at **9:45 AM America/New_York** for trade mode and **4:15 PM America/New_York** for report mode through both EST and EDT using native GitHub timezone scheduling.
+> The scheduled workflow runs at **10:15 AM America/New_York** for trade mode, **3:40 PM** (and **12:40 PM** for early-close days) for the fractional EOD cleanup, and **4:15 PM America/New_York** for report mode through both EST and EDT using native GitHub timezone scheduling.
 
 ## 🚀 Local Quick Start
 
@@ -201,6 +229,7 @@ Copy-Item .env.example .env          # then fill in your keys
 python -m pytest -q                  # run tests
 python -m src.main --mode report     # safe default: reporting/dashboard only
 python -m src.main --mode trade      # paper-trading run with risk checks and broker orders
+python -m src.main --mode eod        # pre-close cleanup: sells fractional stock/ETF positions before their DAY stops expire
 python -m src.main --mode trade --scheduled-run       # scheduled-trade idempotency markers enabled
 python -m src.main --mode report --scheduled-run      # scheduled-report idempotency markers enabled
 python -m src.main --mode report --allow-fallback-data   # explicit local simulation/reporting only

@@ -6,6 +6,13 @@ on:
       timezone: 'America/New_York'
     - cron: '15 16 * * 1-5'
       timezone: 'America/New_York'
+    # Pre-close cleanup of fractional stock/ETF positions whose DAY stops expire at the close.
+    # 15:40 covers a normal 16:00 close; 12:40 covers a 13:00 early close and is a no-op otherwise
+    # (the bot consults Alpaca's clock and only acts inside FRACTIONAL_EOD_WINDOW_MINUTES).
+    - cron: '40 15 * * 1-5'
+      timezone: 'America/New_York'
+    - cron: '40 12 * * 1-5'
+      timezone: 'America/New_York'
   workflow_dispatch:
     inputs:
       mode:
@@ -16,6 +23,7 @@ on:
         options:
           - report
           - trade
+          - eod
 
 permissions:
   contents: write       # needed to push README + data files back to repo
@@ -66,6 +74,8 @@ jobs:
           MAX_DAILY_LOSS_PERCENT: '2'
           MAX_DAILY_TRADES: '3'
           MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          FRACTIONAL_EQUITY_THRESHOLD: '20000'
+          FRACTIONAL_EOD_WINDOW_MINUTES: '30'
           ALLOW_MARGIN:      'false'
           ALLOW_SHORTS:      'false'
           SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
@@ -130,6 +140,8 @@ jobs:
           MAX_DAILY_LOSS_PERCENT: '2'
           MAX_DAILY_TRADES: '3'
           MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          FRACTIONAL_EQUITY_THRESHOLD: '20000'
+          FRACTIONAL_EOD_WINDOW_MINUTES: '30'
           ALLOW_MARGIN:      'false'
           ALLOW_SHORTS:      'false'
           SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}
@@ -155,6 +167,67 @@ jobs:
           git push
 
       - name: ❌  Fail job if scheduled report mode failed
+        if: steps.run_bot.outcome == 'failure'
+        run: exit 1
+
+  scheduled-eod:
+    name: Scheduled Fractional EOD Cleanup
+    if: github.event_name == 'schedule' && (github.event.schedule == '40 15 * * 1-5' || github.event.schedule == '40 12 * * 1-5') && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: ⬇️  Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍  Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 📦  Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: ✅ Run tests
+        run: python -m pytest -q
+
+      - name: 🧹 Run scheduled EOD cleanup mode
+        id: run_bot
+        continue-on-error: true
+        env:
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ALPACA_PAPER:      'true'
+          PORTFOLIO_SIZE:    '100'
+          MAX_POSITION_PERCENT: '10'
+          MAX_DAILY_LOSS_PERCENT: '2'
+          MAX_DAILY_TRADES: '3'
+          MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          FRACTIONAL_EQUITY_THRESHOLD: '20000'
+          FRACTIONAL_EOD_WINDOW_MINUTES: '30'
+          ALLOW_MARGIN:      'false'
+          ALLOW_SHORTS:      'false'
+        run: python -m src.main --mode eod --scheduled-run
+
+      - name: 📊  Commit updated dashboard & portfolio state
+        if: always()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name  "github-actions[bot]"
+          for file in README.md data/portfolio_state.json data/trade_log.csv reports/daily_summary.md; do
+            if [ -f "$file" ]; then
+              git add "$file"
+            fi
+          done
+          git diff --staged --quiet \
+            || git commit -m "🧹 [bot] Fractional EOD cleanup — $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
+
+      # A failed cleanup means a fractional position may be unprotected overnight: fail loudly.
+      - name: ❌  Fail job if scheduled EOD cleanup failed
         if: steps.run_bot.outcome == 'failure'
         run: exit 1
 
@@ -194,6 +267,8 @@ jobs:
           MAX_DAILY_LOSS_PERCENT: '2'
           MAX_DAILY_TRADES: '3'
           MAX_TOTAL_EXPOSURE_PERCENT: '80'
+          FRACTIONAL_EQUITY_THRESHOLD: '20000'
+          FRACTIONAL_EOD_WINDOW_MINUTES: '30'
           ALLOW_MARGIN:      'false'
           ALLOW_SHORTS:      'false'
           SENDER_EMAIL:      ${{ secrets.SENDER_EMAIL }}

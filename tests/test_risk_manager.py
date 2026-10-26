@@ -1,4 +1,13 @@
-from src.risk_manager import RiskConfig, RiskEvaluationContext, RiskManager, validate_trade_startup_config
+from src.risk_manager import (
+    RiskConfig,
+    RiskEvaluationContext,
+    RiskManager,
+    allows_fractional_equity_orders,
+    normalize_qty_for_asset,
+    qty_for_notional,
+    uses_fractional_quantity,
+    validate_trade_startup_config,
+)
 
 
 def _config() -> RiskConfig:
@@ -246,3 +255,155 @@ def test_validate_trade_startup_config_rejects_unsafe_settings():
     assert any("MIN_CONFIDENCE" in error for error in errors)
 
 
+
+
+# ── fractional equity sizing ──────────────────────────────────────────────────
+
+
+def _small_budget_config() -> RiskConfig:
+    # Mirrors the live bot's ~$100 strategy capital: $10 per-symbol cap, $80 gross exposure cap.
+    return RiskConfig(
+        portfolio_size=100,
+        max_position_percent=10,
+        max_daily_loss_percent=2,
+        max_daily_trades=3,
+        max_total_exposure_percent=80,
+        allow_margin=False,
+        allow_shorts=False,
+        min_confidence=0.70,
+        max_risk_percent=1.0,
+    )
+
+
+def _small_budget_context(**overrides) -> RiskEvaluationContext:
+    values = {
+        "entry_price": 347.0,
+        "account_equity": 200.0,
+        "actual_available_cash": 100.0,
+        "remaining_portfolio_capacity": 100.0,
+    }
+    values.update(overrides)
+    return _context(**values)
+
+
+def test_fractional_buy_sizes_below_one_share_when_equity_is_under_threshold():
+    manager = RiskManager(config=_small_budget_config())
+    allow_fractional = allows_fractional_equity_orders(200.0, "stock", True, manager.config.fractional_equity_threshold)
+    assert allow_fractional is True
+
+    result = manager.evaluate(
+        _decision(qty=0.0288, stop_loss=340.0),
+        _small_budget_context(symbol_fractionable=True, allow_fractional=allow_fractional),
+    )
+
+    assert result.approved, result.reasons
+    # $10 position cap / $347 share price = 0.02881..., floored to 4 decimal places.
+    assert result.adjusted_qty == 0.0288
+    assert result.adjusted_qty * 347.0 <= 10.0
+
+
+def test_fractional_buy_is_resized_down_to_the_position_cap():
+    manager = RiskManager(config=_small_budget_config())
+    result = manager.evaluate(
+        _decision(qty=1.0, stop_loss=340.0),
+        _small_budget_context(symbol_fractionable=True, allow_fractional=True),
+    )
+    assert result.approved, result.reasons
+    assert result.adjusted_qty == 0.0288
+    assert any("resized buy quantity" in note.lower() for note in result.notes)
+
+
+def test_whole_share_flooring_is_kept_when_equity_is_over_threshold():
+    threshold = RiskConfig().fractional_equity_threshold
+    assert allows_fractional_equity_orders(25_000.0, "stock", True, threshold) is False
+    assert normalize_qty_for_asset("stock", 2.9) == 2.0
+    assert qty_for_notional("stock", 347.0, 1_000.0) == 2.0
+
+    manager = RiskManager(config=_config())
+    result = manager.evaluate(
+        _decision(qty=3.7, stop_loss=340.0),
+        _context(entry_price=347.0, account_equity=25_000.0, symbol_fractionable=True, allow_fractional=False),
+    )
+    assert result.approved, result.reasons
+    assert result.adjusted_qty == 2.0
+
+
+def test_small_budget_without_fractional_allowance_cannot_buy_expensive_stock():
+    # Over the threshold (or asset not fractionable) a $10 cap on a $347 stock floors to zero shares.
+    manager = RiskManager(config=_small_budget_config())
+    result = manager.evaluate(
+        _decision(qty=0.0288, stop_loss=340.0),
+        _small_budget_context(symbol_fractionable=True, allow_fractional=False),
+    )
+    assert not result.approved
+    assert any("quantity must be positive" in reason.lower() for reason in result.reasons)
+
+
+def test_fractional_buy_requires_broker_fractionable_asset():
+    manager = RiskManager(config=_small_budget_config())
+    result = manager.evaluate(
+        _decision(qty=0.0288, stop_loss=340.0),
+        _small_budget_context(symbol_fractionable=False, allow_fractional=True),
+    )
+    assert not result.approved
+    assert any("fractional-share execution" in reason.lower() for reason in result.reasons)
+
+
+def test_crypto_sizing_is_unchanged_by_fractional_equity_policy():
+    threshold = RiskConfig().fractional_equity_threshold
+    assert allows_fractional_equity_orders(100_000.0, "crypto", False, threshold) is True
+    assert normalize_qty_for_asset("crypto", 0.123456) == 0.1234
+    assert normalize_qty_for_asset("crypto", 0.123456, allow_fractional=True) == 0.1234
+    assert qty_for_notional("crypto", 60_000.0, 10.0) == 0.0001
+    assert uses_fractional_quantity("crypto", 2.0) is True
+    assert uses_fractional_quantity("stock", 2.0) is False
+    assert uses_fractional_quantity("etf", 0.5) is True
+
+    manager = RiskManager(config=_small_budget_config())
+    result = manager.evaluate(
+        _decision(symbol="BTC/USD", qty=0.0001, stop_loss=59_000.0),
+        _small_budget_context(asset_type="crypto", entry_price=60_000.0, allow_fractional=False),
+    )
+    assert result.approved, result.reasons
+    assert result.adjusted_qty == 0.0001
+
+
+def test_fractional_equity_policy_uses_configured_threshold():
+    threshold = 20_000.0
+    assert allows_fractional_equity_orders(100.0, "stock", True, threshold) is True
+    assert allows_fractional_equity_orders(19_999.99, "etf", True, threshold) is True
+    assert allows_fractional_equity_orders(20_000.0, "stock", True, threshold) is False
+    assert allows_fractional_equity_orders(100.0, "stock", False, threshold) is False
+    assert allows_fractional_equity_orders(100.0, "option", True, threshold) is False
+
+
+def test_fractional_position_can_still_be_sold_to_close():
+    manager = RiskManager(config=_small_budget_config())
+    context = _small_budget_context(
+        current_position_qty=0.0288,
+        current_position_market_value=10.0,
+        symbol_fractionable=True,
+        allow_fractional=True,
+    )
+
+    exact = manager.evaluate(_decision(action="sell", qty=0.0288, stop_loss=None), context)
+    assert exact.approved, exact.reasons
+    assert exact.adjusted_qty == 0.0288
+
+    oversized = manager.evaluate(_decision(action="sell", qty=1.0, stop_loss=None), context)
+    assert oversized.approved, oversized.reasons
+    assert oversized.adjusted_qty == 0.0288
+    assert any("resized sell quantity" in note.lower() for note in oversized.notes)
+
+
+def test_fractional_equity_threshold_is_read_from_env_and_config(monkeypatch):
+    monkeypatch.delenv("FRACTIONAL_EQUITY_THRESHOLD", raising=False)
+    assert RiskConfig.from_sources({}).fractional_equity_threshold == 20_000.0
+    assert RiskConfig.from_sources({"fractional_equity_threshold": 500}).fractional_equity_threshold == 500.0
+
+    monkeypatch.setenv("FRACTIONAL_EQUITY_THRESHOLD", "1500")
+    assert RiskConfig.from_sources({"fractional_equity_threshold": 500}).fractional_equity_threshold == 1_500.0
+
+    errors = validate_trade_startup_config(RiskConfig(fractional_equity_threshold=-1), paper_trading=True)
+    assert any("FRACTIONAL_EQUITY_THRESHOLD" in error for error in errors)
+    assert validate_trade_startup_config(RiskConfig(fractional_equity_threshold=0), paper_trading=True) == []

@@ -21,7 +21,9 @@ def test_scheduled_and_manual_bot_workflow_use_explicit_modes_and_paper_trading_
     assert "default: report" in content
     assert "python -m src.main --mode trade --scheduled-run" in content
     assert "python -m src.main --mode report --scheduled-run" in content
+    assert "python -m src.main --mode eod --scheduled-run" in content
     assert "run: python -m src.main --mode ${{ inputs.mode }}" in content
+    assert "          - eod\n" in content
     assert "ALPACA_PAPER:      'true'" in content
     assert "push:" not in content
     assert "pull_request:" not in content
@@ -32,9 +34,14 @@ def test_bot_workflow_has_concurrency_and_dst_safe_schedules():
     assert "concurrency:" in content
     assert "group: alpaca-paper-trading-bot" in content
     assert "cancel-in-progress: false" in content
-    assert content.count("timezone: 'America/New_York'") == 2
+    assert content.count("timezone: 'America/New_York'") == 4
     assert "cron: '15 10 * * 1-5'" in content
     assert "github.event.schedule == '15 10 * * 1-5'" in content  # the trade job keys on the same cron it is scheduled with
+    # Fractional DAY-stop cleanup: 20 minutes before a normal close and before a 13:00 early close.
+    assert "cron: '40 15 * * 1-5'" in content
+    assert "cron: '40 12 * * 1-5'" in content
+    assert "github.event.schedule == '40 15 * * 1-5' || github.event.schedule == '40 12 * * 1-5'" in content
+    assert "FRACTIONAL_EOD_WINDOW_MINUTES: '30'" in content
     assert "45 9 * * 1-5" not in content
     assert "15 16 * * 1-5" in content
     assert "45 13 * * 1-5" not in content
@@ -51,3 +58,14 @@ def test_bot_workflow_commits_state_even_if_bot_step_fails():
     assert "steps.run_bot.outcome == 'failure'" in content
 
 
+
+
+def test_eod_cleanup_job_fails_loudly_but_still_commits_state():
+    content = BOT_WORKFLOW.read_text(encoding="utf-8")
+    eod_job = content.split("  scheduled-eod:")[1].split("  manual-run:")[0]
+    assert "python -m src.main --mode eod --scheduled-run" in eod_job
+    assert "ALPACA_PAPER:      'true'" in eod_job
+    assert "continue-on-error: true" in eod_job
+    assert "if: always()" in eod_job
+    assert "steps.run_bot.outcome == 'failure'" in eod_job
+    assert "EMAIL_REQUIRED" not in eod_job  # the 16:15 report run emails; a cleanup must not fail on SMTP

@@ -32,6 +32,16 @@ class ExecutionResult:
     protection_retry_count: int = 0
     cancel_poll_attempts: int = 0
     stop_confirmation_poll_attempts: int = 0
+    # Fractional equity entries can only carry a DAY stop, which expires at the close.
+    protection_time_in_force: str | None = None
+    requires_eod_exit: bool = False
+    entry_poll_attempts: int = 0
+    entry_cancel_attempted: bool = False
+    entry_cancel_confirmed: bool = False
+    terminal_entry_status: str | None = None
+    # End-of-day cleanup exits confirm the SELL reached a terminal broker state before reconciling.
+    eod_exit: bool = False
+    exit_poll_attempts: int = 0
 
     def to_dict(self) -> dict:
         return asdict(self)
