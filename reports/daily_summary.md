@@ -1,44 +1,43 @@
-# Daily Summary — 2026-10-26
+# Daily Summary — 2026-10-27
 
-- Run mode: `report`
+- Run mode: `trade`
 ## 💰 Portfolio
 - Configured strategy budget: $100.00
 - Strategy max gross exposure: $80.00
-- Alpaca paper account equity: $116,133.50
+- Alpaca paper account equity: $117,120.87
 - Broker cash: $-118,533.96
-- Broker buying power: $121,163.78
-- Actual broker gross exposure: $234,667.46
-- Broker position P&L: $+28,032.29 (+28032.29%)
-- Daily P&L (final equity - start of day): $-943.58
+- Broker buying power: $123,608.21
+- Actual broker gross exposure: $235,654.83
+- Broker position P&L: $+29,019.66 (+29019.66%)
+- Daily P&L (final equity - start of day): $+1.75
 - Trades executed today: 0
 
 ## ⚠️ Safety Status
-- Current gross exposure $234667.46 exceeds the configured limit of $80.00. New BUY orders are blocked until exposure is reduced.
+- Current gross exposure $235654.83 exceeds the configured limit of $80.00. New BUY orders are blocked until exposure is reduced.
 - LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $100.00 strategy controls were enforced.
-- Existing AAPL position value $24081.40 exceeds the configured per-position limit of $10.00.
-- Existing AMZN position value $14942.74 exceeds the configured per-position limit of $10.00.
-- Existing AVGO position value $6941.76 exceeds the configured per-position limit of $10.00.
-- Existing BTC/USD position value $16384.38 exceeds the configured per-position limit of $10.00.
-- Existing ETH/USD position value $1449.82 exceeds the configured per-position limit of $10.00.
-- Existing GOOGL position value $10782.49 exceeds the configured per-position limit of $10.00.
-- Existing LLY position value $58971.54 exceeds the configured per-position limit of $10.00.
-- Existing META position value $18923.40 exceeds the configured per-position limit of $10.00.
-- Existing MSFT position value $17036.80 exceeds the configured per-position limit of $10.00.
-- Existing NVDA position value $39117.72 exceeds the configured per-position limit of $10.00.
-- Existing SOL/USD position value $1545.79 exceeds the configured per-position limit of $10.00.
-- Existing SPY position value $4591.50 exceeds the configured per-position limit of $10.00.
-- Existing TSLA position value $9381.60 exceeds the configured per-position limit of $10.00.
-- Existing VTI position value $10516.52 exceeds the configured per-position limit of $10.00.
-- Daily loss circuit breaker triggered: Start-of-day equity: $117077.08; Current equity: $116133.50; Daily P&L: $-943.58; Limit: -$2.00.
+- Existing AAPL position value $24167.50 exceeds the configured per-position limit of $10.00.
+- Existing AMZN position value $15041.40 exceeds the configured per-position limit of $10.00.
+- Existing AVGO position value $7122.78 exceeds the configured per-position limit of $10.00.
+- Existing BTC/USD position value $16417.19 exceeds the configured per-position limit of $10.00.
+- Existing ETH/USD position value $1452.75 exceeds the configured per-position limit of $10.00.
+- Existing GOOGL position value $10864.70 exceeds the configured per-position limit of $10.00.
+- Existing LLY position value $59127.48 exceeds the configured per-position limit of $10.00.
+- Existing META position value $18769.80 exceeds the configured per-position limit of $10.00.
+- Existing MSFT position value $16997.76 exceeds the configured per-position limit of $10.00.
+- Existing NVDA position value $39349.40 exceeds the configured per-position limit of $10.00.
+- Existing SOL/USD position value $1545.73 exceeds the configured per-position limit of $10.00.
+- Existing SPY position value $4602.42 exceeds the configured per-position limit of $10.00.
+- Existing TSLA position value $9657.00 exceeds the configured per-position limit of $10.00.
+- Existing VTI position value $10538.92 exceeds the configured per-position limit of $10.00.
 
 ## 🤖 AI Decisions
-- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for NVDA (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AAPL (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for MSFT (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for GOOGL (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AMZN (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for VTI (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AVGO** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AVGO (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
-- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for LLY (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **AVGO** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
+- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **META** — BUY (conf=0.80) → ❌ REJECTED: Rejected: quantity must be positive.
+- **LLY** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.; Rejected: quantity must be positive.
