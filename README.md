@@ -248,7 +248,7 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-10-27 19:44 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-10-27 20:19 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -258,12 +258,12 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 |:-------|------:|
 | 🧭 Configured Strategy Budget | `$100.00` |
 | 🛡️ Strategy Max Gross Exposure | `$80.00` |
-| 💵 Alpaca Paper Account Equity | `$117,951.16` |
+| 💵 Alpaca Paper Account Equity | `$117,606.08` |
 | 💸 Broker Cash Available | `$-118,533.96` |
-| 🧾 Broker Buying Power | `$125,345.06` |
-| 📦 Actual Broker Gross Exposure | `$236,485.12` |
-| 🟢 Broker Position P&L | `+$29,849.95` &nbsp; `(+29849.95%)` |
-| 📆 Daily P&L (final equity - start of day) | `+$832.04` |
+| 🧾 Broker Buying Power | `$124,381.47` |
+| 📦 Actual Broker Gross Exposure | `$236,140.04` |
+| 🟢 Broker Position P&L | `+$29,504.87` &nbsp; `(+29504.87%)` |
+| 📆 Daily P&L (final equity - start of day) | `+$486.96` |
 
 ### ⚠️ LEGACY PAPER ACCOUNT STATE
 
@@ -275,62 +275,62 @@ The bot will warn, block additional BUY exposure, and continue allowing valid ri
 
 ### ⚠️ Safety Warnings
 
-- Current gross exposure $236485.12 exceeds the configured limit of $80.00. New BUY orders are blocked until exposure is reduced.
+- Current gross exposure $236140.04 exceeds the configured limit of $80.00. New BUY orders are blocked until exposure is reduced.
 - LEGACY PAPER ACCOUNT STATE: current broker equity/P&L may reflect positions created before the hardened $100.00 strategy controls were enforced.
-- Existing AAPL position value $24291.05 exceeds the configured per-position limit of $10.00.
-- Existing AMZN position value $15235.20 exceeds the configured per-position limit of $10.00.
-- Existing AVGO position value $7222.32 exceeds the configured per-position limit of $10.00.
-- Existing BTC/USD position value $16560.30 exceeds the configured per-position limit of $10.00.
-- Existing ETH/USD position value $1470.88 exceeds the configured per-position limit of $10.00.
-- Existing GOOGL position value $10998.32 exceeds the configured per-position limit of $10.00.
-- Existing LLY position value $58949.00 exceeds the configured per-position limit of $10.00.
-- Existing META position value $18645.30 exceeds the configured per-position limit of $10.00.
-- Existing MSFT position value $17041.12 exceeds the configured per-position limit of $10.00.
-- Existing NVDA position value $39506.87 exceeds the configured per-position limit of $10.00.
-- Existing SOL/USD position value $1557.14 exceeds the configured per-position limit of $10.00.
-- Existing SPY position value $4624.74 exceeds the configured per-position limit of $10.00.
-- Existing TSLA position value $9787.68 exceeds the configured per-position limit of $10.00.
-- Existing VTI position value $10595.20 exceeds the configured per-position limit of $10.00.
+- Existing AAPL position value $24311.00 exceeds the configured per-position limit of $10.00.
+- Existing AMZN position value $15208.80 exceeds the configured per-position limit of $10.00.
+- Existing AVGO position value $7165.20 exceeds the configured per-position limit of $10.00.
+- Existing BTC/USD position value $16566.98 exceeds the configured per-position limit of $10.00.
+- Existing ETH/USD position value $1470.26 exceeds the configured per-position limit of $10.00.
+- Existing GOOGL position value $10920.80 exceeds the configured per-position limit of $10.00.
+- Existing LLY position value $58967.86 exceeds the configured per-position limit of $10.00.
+- Existing META position value $18577.44 exceeds the configured per-position limit of $10.00.
+- Existing MSFT position value $17025.92 exceeds the configured per-position limit of $10.00.
+- Existing NVDA position value $39410.94 exceeds the configured per-position limit of $10.00.
+- Existing SOL/USD position value $1558.38 exceeds the configured per-position limit of $10.00.
+- Existing SPY position value $4619.22 exceeds the configured per-position limit of $10.00.
+- Existing TSLA position value $9758.84 exceeds the configured per-position limit of $10.00.
+- Existing VTI position value $10578.40 exceeds the configured per-position limit of $10.00.
 
 ### 📝 Daily Trade Summary
 
-- **Broker position P&L:** `+$29,849.95` (+29849.95%)
-- **Daily P&L:** `+$832.04`
+- **Broker position P&L:** `+$29,504.87` (+29504.87%)
+- **Daily P&L:** `+$486.96`
 - **Executed today:** No buy/sell orders were approved in this run.
 
 ### 📈 Open Positions
 
 | Symbol | Type | Qty | Avg Cost | Price | Mkt Value | Unrealized P&L | P&L % |
 |:-------|:-----|----:|---------:|------:|----------:|---------------:|------:|
-| **AAPL** | STOCK | 70.00 | $307.57 | $347.01 | $24,291.05 | 🟢 +$2,761.44 | +12.83% |
-| **AMZN** | STOCK | 60.00 | $249.93 | $253.92 | $15,235.20 | 🟢 +$239.30 | +1.60% |
-| **AVGO** | STOCK | 21.00 | $379.32 | $343.92 | $7,222.32 | 🔴 $-743.45 | -9.33% |
-| **BTC/USD** | CRYPTO | 0.2054 | $3,347.26 | $80,626.61 | $16,560.30 | 🟢 +$15,872.79 | +2308.74% |
-| **ETH/USD** | CRYPTO | 0.6272 | N/A | $2,345.00 | $1,470.88 | 🟢 +$1,470.88 | 0.00% |
-| **GOOGL** | STOCK | 34.00 | $350.77 | $323.48 | $10,998.32 | 🔴 $-928.00 | -7.78% |
-| **LLY** | STOCK | 46.00 | $1,179.52 | $1,281.50 | $58,949.00 | 🟢 +$4,691.22 | +8.65% |
-| **META** | STOCK | 30.00 | $595.70 | $621.51 | $18,645.30 | 🟢 +$774.27 | +4.33% |
-| **MSFT** | STOCK | 32.00 | $416.49 | $532.53 | $17,041.12 | 🟢 +$3,713.49 | +27.86% |
-| **NVDA** | STOCK | 181.00 | $214.73 | $218.27 | $39,506.87 | 🟢 +$640.68 | +1.65% |
-| **SOL/USD** | CRYPTO | 15.42 | N/A | $100.99 | $1,557.14 | 🟢 +$1,557.14 | 0.00% |
-| **SPY** | ETF | 6.0000 | $745.44 | $770.79 | $4,624.74 | 🟢 +$152.08 | +3.40% |
-| **TSLA** | STOCK | 24.00 | $432.23 | $407.82 | $9,787.68 | 🔴 $-585.89 | -5.65% |
-| **VTI** | STOCK | 28.00 | $370.04 | $378.40 | $10,595.20 | 🟢 +$234.00 | +2.26% |
+| **AAPL** | STOCK | 70.00 | $307.57 | $347.30 | $24,311.00 | 🟢 +$2,781.39 | +12.92% |
+| **AMZN** | STOCK | 60.00 | $249.93 | $253.48 | $15,208.80 | 🟢 +$212.90 | +1.42% |
+| **AVGO** | STOCK | 21.00 | $379.32 | $341.20 | $7,165.20 | 🔴 $-800.57 | -10.05% |
+| **BTC/USD** | CRYPTO | 0.2054 | $3,347.26 | $80,659.15 | $16,566.98 | 🟢 +$15,879.47 | +2309.71% |
+| **ETH/USD** | CRYPTO | 0.6272 | N/A | $2,344.01 | $1,470.26 | 🟢 +$1,470.26 | 0.00% |
+| **GOOGL** | STOCK | 34.00 | $350.77 | $321.20 | $10,920.80 | 🔴 $-1,005.52 | -8.43% |
+| **LLY** | STOCK | 46.00 | $1,179.52 | $1,281.91 | $58,967.86 | 🟢 +$4,710.08 | +8.68% |
+| **META** | STOCK | 30.00 | $595.70 | $619.25 | $18,577.44 | 🟢 +$706.41 | +3.95% |
+| **MSFT** | STOCK | 32.00 | $416.49 | $532.06 | $17,025.92 | 🟢 +$3,698.29 | +27.75% |
+| **NVDA** | STOCK | 181.00 | $214.73 | $217.74 | $39,410.94 | 🟢 +$544.75 | +1.40% |
+| **SOL/USD** | CRYPTO | 15.42 | N/A | $101.07 | $1,558.38 | 🟢 +$1,558.38 | 0.00% |
+| **SPY** | STOCK | 6.0000 | $745.44 | $769.87 | $4,619.22 | 🟢 +$146.56 | +3.28% |
+| **TSLA** | STOCK | 24.00 | $432.23 | $406.62 | $9,758.84 | 🔴 $-614.73 | -5.93% |
+| **VTI** | ETF | 28.00 | $370.04 | $377.80 | $10,578.40 | 🟢 +$217.20 | +2.10% |
 
 ### 🎯 Watchlist — 10 Symbols
 
 | # | Symbol | Name | Type | Last Price | Day Change | Signal | Confidence |
 |--:|:-------|:-----|:----:|-----------:|-----------:|:------:|:----------:|
-| 1 | **AAPL** | Apple Inc. | STOCK | — | — | — | — |
-| 2 | **NVDA** | NVIDIA Corp. | STOCK | — | — | — | — |
-| 3 | **TSLA** | Tesla Inc. | STOCK | — | — | — | — |
-| 4 | **MSFT** | Microsoft Corp. | STOCK | — | — | — | — |
-| 5 | **AMZN** | Amazon.com Inc. | STOCK | — | — | — | — |
-| 6 | **META** | Meta Platforms Inc. | STOCK | — | — | — | — |
-| 7 | **SPY** | SPDR S&P 500 ETF | ETF | — | — | — | — |
-| 8 | **BTC/USD** | Bitcoin | CRYPTO | — | — | — | — |
-| 9 | **ETH/USD** | Ethereum | CRYPTO | — | — | — | — |
-| 10 | **SOL/USD** | Solana | CRYPTO | — | — | — | — |
+| 1 | **NVDA** | NVIDIA Corp. | STOCK | $217.87 | 🟢 +0.86% | HOLD | — |
+| 2 | **AAPL** | Apple Inc. | STOCK | $347.10 | 🟢 +0.92% | HOLD | — |
+| 3 | **MSFT** | Microsoft Corp. | STOCK | $531.58 | 🔴 -0.18% | HOLD | — |
+| 4 | **GOOGL** | Alphabet Inc. | STOCK | $320.60 | 🟢 +1.20% | HOLD | — |
+| 5 | **AMZN** | Amazon.com Inc. | STOCK | $253.15 | 🟢 +1.61% | HOLD | — |
+| 6 | **VTI** | Vanguard Total Stock Market ETF | ETF | $377.91 | 🟢 +0.62% | HOLD | — |
+| 7 | **AVGO** | Broadcom Inc. | STOCK | $342.45 | 🟢 +4.00% | **SELL** | 100% |
+| 8 | **BTC/USD** | Bitcoin | CRYPTO | $80,659.15 | 🟢 +0.81% | HOLD | — |
+| 9 | **META** | Meta Platforms Inc. | STOCK | $620.12 | 🔴 -1.63% | **BUY** | 96% |
+| 10 | **LLY** | Eli Lilly and Co. | STOCK | $1,281.52 | 🟢 +0.16% | HOLD | — |
 
 ---
 
@@ -340,16 +340,16 @@ The bot will warn, block additional BUY exposure, and continue allowing valid ri
 
 | # | Symbol | Name | Predicted Action | Confidence | Basis |
 |--:|:-------|:-----|:----------------:|-----------:|:------|
-| 1 | **AAPL** | Apple Inc. | — | — | — |
-| 2 | **NVDA** | NVIDIA Corp. | — | — | — |
-| 3 | **TSLA** | Tesla Inc. | — | — | — |
-| 4 | **MSFT** | Microsoft Corp. | — | — | — |
-| 5 | **AMZN** | Amazon.com Inc. | — | — | — |
-| 6 | **META** | Meta Platforms Inc. | — | — | — |
-| 7 | **SPY** | SPDR S&P 500 ETF | — | — | — |
-| 8 | **BTC/USD** | Bitcoin | — | — | — |
-| 9 | **ETH/USD** | Ethereum | — | — | — |
-| 10 | **SOL/USD** | Solana | — | — | — |
+| 1 | **NVDA** | NVIDIA Corp. | **BUY** | 48% | Moderate positive momentum (+0.86%) — continuation expected |
+| 2 | **AAPL** | Apple Inc. | **BUY** | 48% | Moderate positive momentum (+0.92%) — continuation expected |
+| 3 | **MSFT** | Microsoft Corp. | HOLD | 50% | Flat session today (-0.18%) — no trend to carry forward |
+| 4 | **GOOGL** | Alphabet Inc. | **BUY** | 48% | Moderate positive momentum (+1.20%) — continuation expected |
+| 5 | **AMZN** | Amazon.com Inc. | **BUY** | 48% | Moderate positive momentum (+1.61%) — continuation expected |
+| 6 | **VTI** | Vanguard Total Stock Market ETF | **BUY** | 48% | Moderate positive momentum (+0.62%) — continuation expected |
+| 7 | **AVGO** | Broadcom Inc. | **SELL** | 75% | Extreme gain today (+4.00%) — mean reversion pullback likely |
+| 8 | **BTC/USD** | Bitcoin | **BUY** | 48% | Moderate positive momentum (+0.81%) — continuation expected |
+| 9 | **META** | Meta Platforms Inc. | **SELL** | 84% | Moderate negative momentum (-1.63%) — continuation expected |
+| 10 | **LLY** | Eli Lilly and Co. | HOLD | 50% | Flat session today (+0.16%) — no trend to carry forward |
 
 ---
 
