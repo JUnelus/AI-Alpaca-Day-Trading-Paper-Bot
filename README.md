@@ -248,7 +248,7 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 ## 📊 Live Portfolio Dashboard
 
-> 🕐 **Last updated:** 2026-10-30 14:24 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
+> 🕐 **Last updated:** 2026-10-30 19:43 UTC &nbsp;|&nbsp; **Trades today:** 0 &nbsp;|&nbsp; 🧪 Paper trading only — not financial advice
 
 ---
 
@@ -279,16 +279,16 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 | # | Symbol | Name | Type | Last Price | Day Change | Signal | Confidence |
 |--:|:-------|:-----|:----:|-----------:|-----------:|:------:|:----------:|
-| 1 | **AAPL** | Apple Inc. | STOCK | $345.90 | 🔴 -0.88% | HOLD | — |
-| 2 | **NVDA** | NVIDIA Corp. | STOCK | $206.02 | 🔴 -3.59% | HOLD | — |
-| 3 | **MSFT** | Microsoft Corp. | STOCK | $519.70 | 🔴 -2.02% | HOLD | — |
-| 4 | **GOOGL** | Alphabet Inc. | STOCK | $279.96 | 🔴 -1.27% | HOLD | — |
-| 5 | **AMZN** | Amazon.com Inc. | STOCK | $236.28 | 🔴 -3.07% | HOLD | — |
-| 6 | **VTI** | Vanguard Total Stock Market ETF | ETF | $372.40 | 🔴 -1.56% | HOLD | — |
-| 7 | **META** | Meta Platforms Inc. | STOCK | $616.46 | 🔴 -1.29% | HOLD | — |
-| 8 | **AVGO** | Broadcom Inc. | STOCK | $327.26 | 🔴 -5.16% | HOLD | — |
-| 9 | **BTC/USD** | Bitcoin | CRYPTO | $76,824.60 | 🔴 -1.26% | HOLD | — |
-| 10 | **LLY** | Eli Lilly and Co. | STOCK | $1,430.05 | 🟢 +4.12% | **SELL** | 100% |
+| 1 | **AAPL** | Apple Inc. | STOCK | — | — | — | — |
+| 2 | **NVDA** | NVIDIA Corp. | STOCK | — | — | — | — |
+| 3 | **TSLA** | Tesla Inc. | STOCK | — | — | — | — |
+| 4 | **MSFT** | Microsoft Corp. | STOCK | — | — | — | — |
+| 5 | **AMZN** | Amazon.com Inc. | STOCK | — | — | — | — |
+| 6 | **META** | Meta Platforms Inc. | STOCK | — | — | — | — |
+| 7 | **SPY** | SPDR S&P 500 ETF | ETF | — | — | — | — |
+| 8 | **BTC/USD** | Bitcoin | CRYPTO | — | — | — | — |
+| 9 | **ETH/USD** | Ethereum | CRYPTO | — | — | — | — |
+| 10 | **SOL/USD** | Solana | CRYPTO | — | — | — | — |
 
 ---
 
@@ -298,16 +298,16 @@ python -m src.main --mode report --allow-fallback-data   # explicit local simula
 
 | # | Symbol | Name | Predicted Action | Confidence | Basis |
 |--:|:-------|:-----|:----------------:|-----------:|:------|
-| 1 | **AAPL** | Apple Inc. | **SELL** | 48% | Moderate negative momentum (-0.88%) — continuation expected |
-| 2 | **NVDA** | NVIDIA Corp. | **BUY** | 73% | Extreme loss today (-3.59%) — mean reversion pullback likely |
-| 3 | **MSFT** | Microsoft Corp. | **SELL** | 48% | Moderate negative momentum (-2.02%) — continuation expected |
-| 4 | **GOOGL** | Alphabet Inc. | **SELL** | 48% | Moderate negative momentum (-1.27%) — continuation expected |
-| 5 | **AMZN** | Amazon.com Inc. | **BUY** | 70% | Extreme loss today (-3.07%) — mean reversion pullback likely |
-| 6 | **VTI** | Vanguard Total Stock Market ETF | **SELL** | 48% | Moderate negative momentum (-1.56%) — continuation expected |
-| 7 | **META** | Meta Platforms Inc. | **SELL** | 48% | Moderate negative momentum (-1.29%) — continuation expected |
-| 8 | **AVGO** | Broadcom Inc. | **BUY** | 78% | Extreme loss today (-5.16%) — mean reversion pullback likely |
-| 9 | **BTC/USD** | Bitcoin | **SELL** | 48% | Moderate negative momentum (-1.26%) — continuation expected |
-| 10 | **LLY** | Eli Lilly and Co. | **SELL** | 76% | Extreme gain today (+4.12%) — mean reversion pullback likely |
+| 1 | **AAPL** | Apple Inc. | — | — | — |
+| 2 | **NVDA** | NVIDIA Corp. | — | — | — |
+| 3 | **TSLA** | Tesla Inc. | — | — | — |
+| 4 | **MSFT** | Microsoft Corp. | — | — | — |
+| 5 | **AMZN** | Amazon.com Inc. | — | — | — |
+| 6 | **META** | Meta Platforms Inc. | — | — | — |
+| 7 | **SPY** | SPDR S&P 500 ETF | — | — | — |
+| 8 | **BTC/USD** | Bitcoin | — | — | — |
+| 9 | **ETH/USD** | Ethereum | — | — | — |
+| 10 | **SOL/USD** | Solana | — | — | — |
 
 ---
 
