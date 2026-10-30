@@ -1,6 +1,6 @@
-# Daily Summary — 2026-10-29
+# Daily Summary — 2026-10-30
 
-- Run mode: `report`
+- Run mode: `trade`
 ## 💰 Portfolio
 - Configured strategy budget: $100.00
 - Strategy max gross exposure: $80.00
@@ -16,13 +16,13 @@
 - No active safety warnings.
 
 ## 🤖 AI Decisions
-- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for AAPL (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for MSFT (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for VTI (source=alpaca).; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **AVGO** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
-- **LLY** — SELL (conf=1.00) → ❌ REJECTED: Rejected: report mode cannot place orders.; Rejected: fresh Alpaca market data unavailable for LLY (source=alpaca).
+- **AAPL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **NVDA** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **MSFT** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **GOOGL** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AMZN** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **VTI** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **META** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **AVGO** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **BTC/USD** — HOLD (conf=0.55) → ❌ REJECTED: Rejected: confidence 0.55 below 0.70.; Rejected: hold signal does not place a trade.
+- **LLY** — SELL (conf=1.00) → ❌ REJECTED: Rejected: no long position exists to sell.
