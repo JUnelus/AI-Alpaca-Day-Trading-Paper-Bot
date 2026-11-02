@@ -1,38 +1,15 @@
 {
   "starting_balance": 100.0,
   "account_equity": 199.51,
-  "cash": 192.8,
-  "buying_power": 192.8,
-  "positions": [
-    {
-      "symbol": "AAPL",
-      "asset_type": "stock",
-      "qty": 0.0102,
-      "avg_entry_price": 340.954,
-      "current_price": 340.9351,
-      "market_value": 3.477538,
-      "cost_basis": 3.477731,
-      "unrealized_pnl": -0.000193,
-      "unrealized_pnl_pct": -0.006
-    },
-    {
-      "symbol": "LLY",
-      "asset_type": "stock",
-      "qty": 0.0023,
-      "avg_entry_price": 1404.512,
-      "current_price": 1403.945,
-      "market_value": 3.229074,
-      "cost_basis": 3.230378,
-      "unrealized_pnl": -0.001304,
-      "unrealized_pnl_pct": -0.04
-    }
-  ],
-  "total_pnl": -0.001497,
-  "total_pnl_pct": -0.001497,
+  "cash": 199.51,
+  "buying_power": 199.51,
+  "positions": [],
+  "total_pnl": 0,
+  "total_pnl_pct": 0.0,
   "yesterday_total_pnl": 0,
   "yesterday_equity": 199.51,
-  "last_updated": "2026-11-02T15:23:01.571761+00:00",
-  "trades_today": 2,
+  "last_updated": "2026-11-02T20:42:50.172005+00:00",
+  "trades_today": 4,
   "trading_day": "2026-11-02",
   "traded_symbols_today": [
     "AAPL",
@@ -42,14 +19,20 @@
   "daily_pnl": 0.0,
   "daily_loss_limit": 2.0,
   "daily_loss_triggered": false,
-  "gross_exposure": 6.706612,
+  "gross_exposure": 0,
   "max_total_exposure": 80.0,
-  "warnings": [],
-  "mode": "trade",
+  "warnings": [
+    "EOD cleanup failed for AAPL: CRITICAL: stale protective order remained open after closing AAPL.",
+    "EOD cleanup failed for LLY: CRITICAL: stale protective order remained open after closing LLY."
+  ],
+  "mode": "eod",
   "last_scheduled_trade_day": "2026-11-02",
   "last_scheduled_report_day": "2026-10-30",
   "last_scheduled_eod_day": "2026-10-30",
-  "eod_cleanup_warnings": [],
+  "eod_cleanup_warnings": [
+    "EOD cleanup failed for AAPL: CRITICAL: stale protective order remained open after closing AAPL.",
+    "EOD cleanup failed for LLY: CRITICAL: stale protective order remained open after closing LLY."
+  ],
   "pnl_data_complete": true,
   "unknown_position_pnl_count": 0
 }
