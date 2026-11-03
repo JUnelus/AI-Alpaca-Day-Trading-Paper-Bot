@@ -1,43 +1,35 @@
 {
   "starting_balance": 100.0,
-  "account_equity": 199.49,
-  "cash": 196.0,
-  "buying_power": 196.0,
-  "positions": [
-    {
-      "symbol": "AAPL",
-      "asset_type": "stock",
-      "qty": 0.0105,
-      "avg_entry_price": 332.492,
-      "current_price": 332.48,
-      "market_value": 3.49104,
-      "cost_basis": 3.491166,
-      "unrealized_pnl": -0.000126,
-      "unrealized_pnl_pct": -0.004
-    }
-  ],
-  "total_pnl": -0.000126,
-  "total_pnl_pct": -0.000126,
+  "account_equity": 199.47,
+  "cash": 199.47,
+  "buying_power": 199.47,
+  "positions": [],
+  "total_pnl": 0,
+  "total_pnl_pct": 0.0,
   "yesterday_total_pnl": 0,
   "yesterday_equity": 199.51,
-  "last_updated": "2026-11-03T15:20:52.364293+00:00",
-  "trades_today": 1,
+  "last_updated": "2026-11-03T20:43:57.045318+00:00",
+  "trades_today": 2,
   "trading_day": "2026-11-03",
   "traded_symbols_today": [
     "AAPL"
   ],
   "start_of_day_equity": 199.49,
-  "daily_pnl": 0.0,
+  "daily_pnl": -0.020000000000010232,
   "daily_loss_limit": 2.0,
   "daily_loss_triggered": false,
-  "gross_exposure": 3.49104,
+  "gross_exposure": 0,
   "max_total_exposure": 80.0,
-  "warnings": [],
-  "mode": "trade",
+  "warnings": [
+    "EOD cleanup failed for AAPL: CRITICAL: stale protective order remained open after closing AAPL."
+  ],
+  "mode": "eod",
   "last_scheduled_trade_day": "2026-11-03",
   "last_scheduled_report_day": "2026-11-02",
   "last_scheduled_eod_day": "2026-10-30",
-  "eod_cleanup_warnings": [],
+  "eod_cleanup_warnings": [
+    "EOD cleanup failed for AAPL: CRITICAL: stale protective order remained open after closing AAPL."
+  ],
   "pnl_data_complete": true,
   "unknown_position_pnl_count": 0
 }
