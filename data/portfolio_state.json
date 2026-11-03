@@ -8,7 +8,7 @@
   "total_pnl_pct": 0.0,
   "yesterday_total_pnl": 0,
   "yesterday_equity": 199.51,
-  "last_updated": "2026-11-03T20:43:57.045318+00:00",
+  "last_updated": "2026-11-03T21:19:34.619423+00:00",
   "trades_today": 2,
   "trading_day": "2026-11-03",
   "traded_symbols_today": [
@@ -23,9 +23,9 @@
   "warnings": [
     "EOD cleanup failed for AAPL: CRITICAL: stale protective order remained open after closing AAPL."
   ],
-  "mode": "eod",
+  "mode": "report",
   "last_scheduled_trade_day": "2026-11-03",
-  "last_scheduled_report_day": "2026-11-02",
+  "last_scheduled_report_day": "2026-11-03",
   "last_scheduled_eod_day": "2026-10-30",
   "eod_cleanup_warnings": [
     "EOD cleanup failed for AAPL: CRITICAL: stale protective order remained open after closing AAPL."
