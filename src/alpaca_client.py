@@ -1161,9 +1161,9 @@ class AlpacaClient:
             return base_result
 
         if actual_remaining_qty <= 0.0:
-            stale_orders, stale_warning = self.find_protective_orders(symbol)
-            if stale_warning or stale_orders:
-                message = stale_warning or f"CRITICAL: stale protective order remained open after closing {symbol}."
+            stale_check = self._confirm_no_open_protection_after_exit(symbol, cancellation_result["cancelled_ids"])
+            if not stale_check["ok"]:
+                message = stale_check["message"]
                 print(message)
                 base_result.success = False
                 base_result.protection_failed = True
@@ -1275,6 +1275,42 @@ class AlpacaClient:
                 f"{', '.join(sorted(ambiguous_sell_orders))}"
             )
         return list(protective_orders.values()), None
+
+    def _confirm_no_open_protection_after_exit(self, symbol: str, cancelled_ids: list[str]) -> dict[str, Any]:
+        """Verify that no protective stop is still working once a SELL has left the position flat.
+
+        Alpaca's open-orders listing can briefly lag a cancellation that a by-id lookup already
+        reports as terminal, so a listed stop is re-checked by id and the listing is polled a
+        bounded number of times. A stop is only cleared on an authoritative terminal status; one
+        that stays open, cannot be looked up, or an ambiguous SELL still fails closed.
+        """
+        attempts = max(1, self.cancel_poll_attempts)
+        still_open: list[str] = []
+        warning: Optional[str] = None
+        for attempt in range(1, attempts + 1):
+            listed_orders, warning = self.find_protective_orders(symbol)
+            still_open = []
+            for order in listed_orders:
+                order_id = self._order_identifier(order)
+                refreshed = self._refresh_order(order_id, nested=False)
+                status = self._status_value(refreshed) if refreshed is not None else None
+                if status in _EXIT_TERMINAL_STATUSES:
+                    continue
+                still_open.append(f"{order_id} (status {status or self._status_value(order) or 'unknown'})")
+            if not warning and not still_open:
+                return {"ok": True, "attempts": attempt, "message": None}
+            if attempt < attempts:
+                self._sleep_between_polls()
+
+        cancelled_note = f" Cancelled before the SELL: {', '.join(cancelled_ids)}." if cancelled_ids else " No protective stop was cancelled before the SELL."
+        if still_open:
+            message = (
+                f"CRITICAL: stale protective order remained open after closing {symbol}: "
+                f"{', '.join(still_open)} after {attempts} checks.{cancelled_note}"
+            )
+        else:
+            message = f"CRITICAL: {warning} after closing {symbol} ({attempts} checks).{cancelled_note}"
+        return {"ok": False, "attempts": attempts, "message": message}
 
     def _cancel_protective_orders(self, symbol: str, protective_orders: list) -> dict[str, Any]:
         if not protective_orders:
