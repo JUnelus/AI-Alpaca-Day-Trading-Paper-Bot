@@ -1283,25 +1283,35 @@ class AlpacaClient:
         reports as terminal, so a listed stop is re-checked by id and the listing is polled a
         bounded number of times. A stop is only cleared on an authoritative terminal status; one
         that stays open, cannot be looked up, or an ambiguous SELL still fails closed.
+
+        A stop seen open on any check stays tracked until its by-id lookup is terminal, because
+        ``list_open_orders`` reports a listing error as an empty list: a later failed or lagging
+        listing must not be read as proof that an already observed stop has gone.
         """
         attempts = max(1, self.cancel_poll_attempts)
-        still_open: list[str] = []
+        # order id -> (last order object seen, last status seen) for stops not yet confirmed terminal
+        unresolved: dict[str, tuple[Any, Optional[str]]] = {}
         warning: Optional[str] = None
         for attempt in range(1, attempts + 1):
             listed_orders, warning = self.find_protective_orders(symbol)
-            still_open = []
+            candidates = dict(unresolved)
             for order in listed_orders:
                 order_id = self._order_identifier(order)
+                if order_id:
+                    candidates[order_id] = (order, self._status_value(order))
+            unresolved = {}
+            for order_id, (order, last_status) in candidates.items():
                 refreshed = self._refresh_order(order_id, nested=False)
                 status = self._status_value(refreshed) if refreshed is not None else None
                 if status in _EXIT_TERMINAL_STATUSES:
                     continue
-                still_open.append(f"{order_id} (status {status or self._status_value(order) or 'unknown'})")
-            if not warning and not still_open:
+                unresolved[order_id] = (refreshed if refreshed is not None else order, status or last_status)
+            if not warning and not unresolved:
                 return {"ok": True, "attempts": attempt, "message": None}
             if attempt < attempts:
                 self._sleep_between_polls()
 
+        still_open = [f"{order_id} (status {status or 'unknown'})" for order_id, (_, status) in unresolved.items()]
         cancelled_note = f" Cancelled before the SELL: {', '.join(cancelled_ids)}." if cancelled_ids else " No protective stop was cancelled before the SELL."
         if still_open:
             message = (

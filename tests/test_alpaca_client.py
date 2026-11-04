@@ -1368,10 +1368,14 @@ class _LaggingOrderListClient(RecordingTradingClient):
     only once the SELL has been submitted, modelling a stop the pre-SELL reconciliation never saw.
     """
 
-    def __init__(self, *args, lagged_listings=0, extra_after_sell=None, unknown_by_id=None, **kwargs):
+    def __init__(self, *args, lagged_listings=0, extra_after_sell=None, unknown_by_id=None, fail_listings_once_extra_seen=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.lagged_listings = lagged_listings
         self.unknown_by_id = set(unknown_by_id or [])
+        # Once an extra order has been listed, every later listing request raises.
+        self.fail_listings_once_extra_seen = fail_listings_once_extra_seen
+        self._extra_ids = {str(getattr(order, "id", "")) for order in (extra_after_sell or [])}
+        self._extra_listed = False
         self.extra_after_sell = list(extra_after_sell or [])
         self.get_orders_calls = 0
 
@@ -1389,7 +1393,11 @@ class _LaggingOrderListClient(RecordingTradingClient):
 
     def get_orders(self, filter=None):
         self.get_orders_calls += 1
+        if self.fail_listings_once_extra_seen and self._extra_listed:
+            raise RuntimeError("orders endpoint unavailable")
         orders = super().get_orders(filter)
+        if any(str(getattr(order, "id", "")) in self._extra_ids for order in orders):
+            self._extra_listed = True
         if self.lagged_listings > 0:
             for order_id in self.cancelled_ids:
                 lagged = self.lookup.get(order_id)
@@ -1477,3 +1485,49 @@ def test_full_sell_reconciles_when_only_the_listing_lags_the_cancelled_stop():
     assert result.success, result.message
     assert result.protection_reconciled
     assert client.cancelled_ids == ["stop-1"]
+
+
+@_requires_alpaca_sdk
+@pytest.mark.parametrize(
+    "by_id_responses, expected_status",
+    [
+        pytest.param("live", "new", id="stop-still-live-by-id"),
+        pytest.param("unknown", "new", id="stop-unresolvable-by-id"),
+    ],
+)
+def test_eod_exit_keeps_an_observed_stop_unresolved_when_later_listings_fail(by_id_responses, expected_status):
+    # The stop is listed once as open; every later listing errors, which list_open_orders reports
+    # as an empty list. That empty list must not clear a stop that was never confirmed terminal.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(
+        extra_after_sell=[stray_stop],
+        fail_listings_once_extra_seen=True,
+        unknown_by_id=["stop-stray"] if by_id_responses == "unknown" else None,
+    )
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert f"stop-stray (status {expected_status})" in result.message
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_clears_an_observed_stop_only_once_its_by_id_lookup_is_terminal():
+    # Listed open on the first check, listing errors afterwards: the retained stop is refreshed by
+    # id and the exit reconciles once that lookup reports it cancelled.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    cancelled_stray = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="canceled", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_stop], fail_listings_once_extra_seen=True)
+    client.order_sequences["stop-stray"] = [stray_stop, cancelled_stray]
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert result.success, result.message
+    assert result.protection_reconciled
+    assert not result.protection_failed
