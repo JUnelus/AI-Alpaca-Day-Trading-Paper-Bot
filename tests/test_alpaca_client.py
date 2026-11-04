@@ -1531,3 +1531,38 @@ def test_eod_exit_clears_an_observed_stop_only_once_its_by_id_lookup_is_terminal
     assert result.success, result.message
     assert result.protection_reconciled
     assert not result.protection_failed
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_keeps_an_observed_non_protective_sell_unresolved_when_later_listings_fail():
+    # A non-protective open SELL is seen once after the exit; every later listing errors. It must
+    # stay tracked by id rather than being dropped with the warning, and the exit fails closed.
+    stray_sell = _order(id="sell-stray", symbol="AAPL", side="sell", qty=0.0105, status="new", order_class=None, legs=[])
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_sell], fail_listings_once_extra_seen=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert "non-protective open sell order(s) remained after closing AAPL: sell-stray (status new)" in result.message
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_clears_a_lagging_non_protective_sell_once_its_by_id_lookup_is_terminal():
+    # The listing briefly shows a SELL that the by-id lookup then reports filled (for example the
+    # exit order itself lagging in the listing): it is cleared instead of failing the cleanup.
+    lagging_sell = _order(id="sell-lagging", symbol="AAPL", side="sell", qty=0.0105, status="new", order_class=None, legs=[])
+    filled_sell = _order(id="sell-lagging", symbol="AAPL", side="sell", qty=0.0105, status="filled", order_class=None, legs=[])
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[lagging_sell])
+    client.order_sequences["sell-lagging"] = [lagging_sell, filled_sell]
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert result.success, result.message
+    assert result.protection_reconciled
+    assert not result.protection_failed

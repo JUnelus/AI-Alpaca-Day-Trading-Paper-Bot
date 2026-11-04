@@ -1252,8 +1252,18 @@ class AlpacaClient:
             return []
 
     def find_protective_orders(self, symbol: str) -> tuple[list, Optional[str]]:
+        protective_orders, ambiguous_sell_orders = self._list_open_sell_orders(symbol)
+        if ambiguous_sell_orders:
+            return [], (
+                f"unable to reconcile existing SELL orders for {symbol} because non-protective open sell order(s) were present: "
+                f"{', '.join(sorted(ambiguous_sell_orders))}"
+            )
+        return list(protective_orders.values()), None
+
+    def _list_open_sell_orders(self, symbol: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Open SELL orders for ``symbol`` by id, split into protective stops and anything else."""
         protective_orders: dict[str, Any] = {}
-        ambiguous_sell_orders: list[str] = []
+        ambiguous_sell_orders: dict[str, Any] = {}
         for order in self.list_open_orders(symbol):
             for candidate in self._iter_order_candidates(order):
                 if self._normalize_symbol(getattr(candidate, "symbol", "")) != self._normalize_symbol(symbol):
@@ -1267,59 +1277,60 @@ class AlpacaClient:
                 if self._is_protective_stop(candidate):
                     protective_orders[order_id] = candidate
                 else:
-                    ambiguous_sell_orders.append(order_id)
-
-        if ambiguous_sell_orders:
-            return [], (
-                f"unable to reconcile existing SELL orders for {symbol} because non-protective open sell order(s) were present: "
-                f"{', '.join(sorted(ambiguous_sell_orders))}"
-            )
-        return list(protective_orders.values()), None
+                    ambiguous_sell_orders[order_id] = candidate
+        return protective_orders, ambiguous_sell_orders
 
     def _confirm_no_open_protection_after_exit(self, symbol: str, cancelled_ids: list[str]) -> dict[str, Any]:
         """Verify that no protective stop is still working once a SELL has left the position flat.
 
         Alpaca's open-orders listing can briefly lag a cancellation that a by-id lookup already
         reports as terminal, so a listed stop is re-checked by id and the listing is polled a
-        bounded number of times. A stop is only cleared on an authoritative terminal status; one
-        that stays open, cannot be looked up, or an ambiguous SELL still fails closed.
+        bounded number of times. An order is only cleared on an authoritative terminal status; a
+        stop or a non-protective SELL that stays open or cannot be looked up still fails closed.
 
-        A stop seen open on any check stays tracked until its by-id lookup is terminal, because
+        An order seen open on any check stays tracked until its by-id lookup is terminal, because
         ``list_open_orders`` reports a listing error as an empty list: a later failed or lagging
         listing must not be read as proof that an already observed stop has gone.
         """
         attempts = max(1, self.cancel_poll_attempts)
-        # order id -> (last order object seen, last status seen) for stops not yet confirmed terminal
-        unresolved: dict[str, tuple[Any, Optional[str]]] = {}
-        warning: Optional[str] = None
+        # order id -> (last order object seen, last status seen, whether it is a protective stop)
+        # for open SELLs not yet confirmed terminal. Non-protective SELLs are tracked the same way:
+        # one that stays live could open a short against the now-flat position.
+        unresolved: dict[str, tuple[Any, Optional[str], bool]] = {}
         for attempt in range(1, attempts + 1):
-            listed_orders, warning = self.find_protective_orders(symbol)
+            protective_orders, ambiguous_orders = self._list_open_sell_orders(symbol)
             candidates = dict(unresolved)
-            for order in listed_orders:
-                order_id = self._order_identifier(order)
-                if order_id:
-                    candidates[order_id] = (order, self._status_value(order))
+            for is_protective, listed in ((True, protective_orders), (False, ambiguous_orders)):
+                for order_id, order in listed.items():
+                    candidates[order_id] = (order, self._status_value(order), is_protective)
             unresolved = {}
-            for order_id, (order, last_status) in candidates.items():
+            for order_id, (order, last_status, is_protective) in candidates.items():
                 refreshed = self._refresh_order(order_id, nested=False)
                 status = self._status_value(refreshed) if refreshed is not None else None
                 if status in _EXIT_TERMINAL_STATUSES:
                     continue
-                unresolved[order_id] = (refreshed if refreshed is not None else order, status or last_status)
-            if not warning and not unresolved:
+                unresolved[order_id] = (refreshed if refreshed is not None else order, status or last_status, is_protective)
+            if not unresolved:
                 return {"ok": True, "attempts": attempt, "message": None}
             if attempt < attempts:
                 self._sleep_between_polls()
 
-        still_open = [f"{order_id} (status {status or 'unknown'})" for order_id, (_, status) in unresolved.items()]
+        def _describe(want_protective: bool) -> list[str]:
+            return [
+                f"{order_id} (status {status or 'unknown'})"
+                for order_id, (_, status, is_protective) in sorted(unresolved.items())
+                if is_protective == want_protective
+            ]
+
+        stale_stops = _describe(True)
+        stale_sells = _describe(False)
+        problems = []
+        if stale_stops:
+            problems.append(f"stale protective order remained open after closing {symbol}: {', '.join(stale_stops)}")
+        if stale_sells:
+            problems.append(f"non-protective open sell order(s) remained after closing {symbol}: {', '.join(stale_sells)}")
         cancelled_note = f" Cancelled before the SELL: {', '.join(cancelled_ids)}." if cancelled_ids else " No protective stop was cancelled before the SELL."
-        if still_open:
-            message = (
-                f"CRITICAL: stale protective order remained open after closing {symbol}: "
-                f"{', '.join(still_open)} after {attempts} checks.{cancelled_note}"
-            )
-        else:
-            message = f"CRITICAL: {warning} after closing {symbol} ({attempts} checks).{cancelled_note}"
+        message = f"CRITICAL: {'; '.join(problems)} after {attempts} checks.{cancelled_note}"
         return {"ok": False, "attempts": attempts, "message": message}
 
     def _cancel_protective_orders(self, symbol: str, protective_orders: list) -> dict[str, Any]:
