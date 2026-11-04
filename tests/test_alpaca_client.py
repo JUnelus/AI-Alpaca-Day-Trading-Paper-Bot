@@ -1645,3 +1645,174 @@ def test_eod_exit_fails_closed_when_a_stray_fill_flips_the_position_short():
     assert result.protection_failed
     assert not result.protection_reconciled
     assert "not flat after the exit (signed quantity -0.0105)" in result.message
+
+
+def _with_position_reads(alpaca, reads):
+    """Make the post-exit signed position check return ``reads`` in turn (the last one repeats)."""
+    remaining = list(reads)
+    calls = []
+
+    def signed_position_qty(symbol):
+        calls.append(symbol)
+        return remaining.pop(0) if len(remaining) > 1 else remaining[0]
+
+    alpaca._signed_position_qty = signed_position_qty
+    return calls
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_retries_a_long_position_read_that_lags_the_exit_fill():
+    # The position endpoint briefly still shows the sold long quantity; that is lag, not a stray
+    # fill (a SELL fill can only move the position down), so the check retries and reconciles.
+    client, alpaca, _ = _eod_exit_setup()
+    calls = _with_position_reads(alpaca, [0.0105, 0.0])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert len(calls) == 2
+    assert result.success, result.message
+    assert result.protection_reconciled
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_a_long_position_never_reads_flat():
+    client, alpaca, _ = _eod_exit_setup()
+    calls = _with_position_reads(alpaca, [0.0105])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert len(calls) == alpaca.cancel_poll_attempts
+    assert not result.success
+    assert result.protection_failed
+    assert f"is not flat after the exit (signed quantity 0.0105) after {alpaca.cancel_poll_attempts} checks" in result.message
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_the_position_cannot_be_read():
+    client, alpaca, _ = _eod_exit_setup()
+    calls = _with_position_reads(alpaca, [None])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert len(calls) == alpaca.cancel_poll_attempts
+    assert not result.success
+    assert result.protection_failed
+    assert "broker position for AAPL could not be verified flat after the exit" in result.message
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_treats_a_replaced_order_as_done():
+    # A tracked stop is replaced during the check: its old id can no longer fill, so it is done.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    replaced_stray = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="replaced", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_stop])
+    client.order_sequences["stop-stray"] = [stray_stop, replaced_stray]
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert result.success, result.message
+    assert result.protection_reconciled
+
+
+def test_signed_position_qty_keeps_shorts_negative_and_reports_unreadable_positions():
+    class Positions:
+        def __init__(self, positions=None, error=None):
+            self.positions = positions or []
+            self.error = error
+
+        def get_open_position(self, symbol):
+            raise self.error or RuntimeError("position not found")
+
+        def get_all_positions(self):
+            if self.error:
+                raise self.error
+            return list(self.positions)
+
+    short = _order(symbol="BTCUSD", qty="-0.5", side="short")
+    assert AlpacaClient(trading_client=Positions([short]), paper=True)._signed_position_qty("BTC/USD") == -0.5
+    assert AlpacaClient(trading_client=Positions([short]), paper=True).get_position_qty("BTC/USD") == 0.0
+    assert AlpacaClient(trading_client=Positions(), paper=True)._signed_position_qty("AAPL") == 0.0
+    unreadable = AlpacaClient(trading_client=Positions(error=RuntimeError("positions endpoint down")), paper=True)
+    assert unreadable._signed_position_qty("AAPL") is None
+    assert unreadable.get_position_qty("AAPL") is None
+    no_qty = AlpacaClient(trading_client=Positions([_order(symbol="BTCUSD", side="long")]), paper=True)
+    assert no_qty._signed_position_qty("BTC/USD") is None
+    assert no_qty.get_position_qty("BTC/USD") == 0.0
+
+
+def test_get_position_skips_the_full_scan_for_a_flat_equity_but_not_for_crypto():
+    class CountingPositions:
+        def __init__(self):
+            self.full_scans = 0
+
+        def get_open_position(self, symbol):
+            raise RuntimeError("position does not exist")
+
+        def get_all_positions(self):
+            self.full_scans += 1
+            return [_order(symbol="BTCUSD", qty="0.1", side="long")]
+
+    client = CountingPositions()
+    alpaca = AlpacaClient(trading_client=client, paper=True)
+
+    assert alpaca.get_position("AAPL") is None
+    assert client.full_scans == 0
+    assert alpaca.get_position("BTC/USD").qty == "0.1"
+    assert client.full_scans == 1
+
+
+@_requires_alpaca_sdk
+def test_sell_is_blocked_when_open_orders_cannot_be_listed_before_the_exit():
+    class BrokenListing(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            raise RuntimeError("orders endpoint unavailable")
+
+    stop_order = _order(id="stop-1", symbol="AAPL", side="sell", qty=5.0, stop_price=95.0, status="new")
+    client = BrokenListing(responses=[], open_orders=[stop_order])
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = alpaca.place_paper_trade(symbol="AAPL", qty=5.0, side="sell", asset_type="stock", mode="trade", current_position_qty=5.0)
+
+    assert not result.success
+    assert result.status == "protection_reconciliation_failed"
+    assert "could not be listed reliably" in result.message
+    assert client.orders == []
+    assert client.cancelled_ids == []
+
+
+@_requires_alpaca_sdk
+def test_is_order_open_counts_a_failed_listing_as_open():
+    class BrokenListing(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            raise RuntimeError("orders endpoint unavailable")
+
+    assert _alpaca(BrokenListing(), paper=True)._is_order_open("stop-1", "AAPL")
+    assert not _alpaca(RecordingTradingClient(), paper=True)._is_order_open("stop-1", "AAPL")
+
+
+@_requires_alpaca_sdk
+def test_partial_sell_fails_closed_when_stacked_stops_cannot_be_ruled_out():
+    class ListingFailsAfterReplacement(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            if len(self.orders) >= 2:
+                raise RuntimeError("orders endpoint unavailable")
+            return super().get_orders(filter)
+
+    old_stop = _order(id="stop-old", symbol="AAPL", side="sell", qty=10.0, stop_price=95.0, status="new")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=4.0, filled_qty=4.0, filled_avg_price=101.0, status="filled", order_class=None, legs=[])
+    replacement_stop = _order(id="stop-new", symbol="AAPL", side="sell", qty=6.0, stop_price=95.0, status="new")
+    client = ListingFailsAfterReplacement(
+        responses=[sell_order, replacement_stop],
+        open_orders=[old_stop],
+        positions=[_order(symbol="AAPL", qty="6", side="long")],
+    )
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = alpaca.place_paper_trade(symbol="AAPL", qty=4.0, side="sell", asset_type="stock", mode="trade", current_position_qty=10.0)
+
+    assert len(client.orders) == 2
+    assert not result.success
+    assert result.protection_failed
+    assert result.status == "critical_unprotected_position"
+    assert "stacked stops cannot be ruled out" in result.message

@@ -18,6 +18,9 @@ _FRACTIONAL_ENTRY_ACTIVE_STATUSES = {"accepted", "new", "pending_new", "partiall
 _FRACTIONAL_ENTRY_CANCEL_PENDING_STATUSES = {"pending_cancel"}
 _FRACTIONAL_ENTRY_NO_FILL_TERMINAL_STATUSES = {"canceled", "cancelled", "rejected", "expired"}
 _EXIT_TERMINAL_STATUSES = {"filled", "canceled", "cancelled", "rejected", "expired"}
+# An order tracked after an exit is done once it can no longer fill under its own id. A replaced
+# order is done: its replacement is listed, and tracked, under a new id.
+_TRACKED_ORDER_DONE_STATUSES = _EXIT_TERMINAL_STATUSES | {"replaced"}
 # Only these broker statuses prove a standalone stop is resting at the broker; transitional
 # (pending_new / pending_cancel) or missing statuses keep polling instead of counting as protection.
 _ACTIVE_STOP_STATUSES = {"accepted", "new", "held", "open", "partially_filled"}
@@ -236,7 +239,12 @@ class AlpacaClient:
         assert client is not None
         try:
             return client.get_open_position(symbol)
-        except Exception:
+        except Exception as exc:
+            if "/" not in symbol and self._is_not_found_error(exc):
+                # A flat equity is reported as "position does not exist"; no need to scan every
+                # position. Slash-form crypto symbols still fall back, since the single-position
+                # endpoint may not resolve them.
+                return None
             try:
                 for position in list(client.get_all_positions()):
                     if self._normalize_symbol(getattr(position, "symbol", "")) == self._normalize_symbol(symbol):
@@ -252,11 +260,16 @@ class AlpacaClient:
         if position is None:
             return 0.0
 
-        qty = self._safe_float(getattr(position, "qty", 0.0))
-        side = self._enum_or_value(getattr(position, "side", None))
-        if side == "short":
-            qty = -abs(qty)
-        return max(0.0, qty)
+        return max(0.0, self._signed_qty_of(position, missing_qty=0.0))
+
+    def _signed_qty_of(self, position, missing_qty: Optional[float]) -> Optional[float]:
+        """A broker position's quantity, negative when short; ``missing_qty`` when absent or unparsable."""
+        qty = self._safe_float(getattr(position, "qty", None), missing_qty)
+        if qty is None:
+            return None
+        if self._enum_or_value(getattr(position, "side", None)) == "short":
+            return -abs(qty)
+        return qty
 
     def get_asset(self, symbol: str) -> BrokerAsset:
         """Broker view of an asset; any lookup failure reads as not tradable / not fractionable (fail closed)."""
@@ -1222,9 +1235,15 @@ class AlpacaClient:
 
         stale_qty = self._open_protective_qty(symbol)
         if stale_qty > actual_remaining_qty + 1e-9:
-            message = (
-                f"CRITICAL: replacement protective stop quantity for {symbol} ({stale_qty:g}) exceeds the verified remaining long position ({actual_remaining_qty:g})."
-            )
+            if math.isinf(stale_qty):
+                message = (
+                    f"CRITICAL: open protective stops for {symbol} could not be verified after replacing protection, "
+                    f"so stacked stops cannot be ruled out for the remaining long position ({actual_remaining_qty:g})."
+                )
+            else:
+                message = (
+                    f"CRITICAL: replacement protective stop quantity for {symbol} ({stale_qty:g}) exceeds the verified remaining long position ({actual_remaining_qty:g})."
+                )
             print(message)
             base_result.success = False
             base_result.protection_failed = True
@@ -1256,7 +1275,14 @@ class AlpacaClient:
             return None
 
     def find_protective_orders(self, symbol: str) -> tuple[list, Optional[str]]:
-        protective_orders, ambiguous_sell_orders, _ = self._list_open_sell_orders(symbol)
+        """Open protective stops for ``symbol``, or a warning when they cannot be reconciled safely.
+
+        A failed listing is a warning, never "no stops": callers use the result to decide whether a
+        SELL may proceed and whether replacement protection would stack on existing stops.
+        """
+        protective_orders, ambiguous_sell_orders, listing_ok = self._list_open_sell_orders(symbol)
+        if not listing_ok:
+            return [], f"open orders for {symbol} could not be listed reliably, so existing protective stops cannot be reconciled"
         if ambiguous_sell_orders:
             return [], (
                 f"unable to reconcile existing SELL orders for {symbol} because non-protective open sell order(s) were present: "
@@ -1297,45 +1323,43 @@ class AlpacaClient:
         bounded number of times. The exit is only reconciled once, on the same check:
 
         - the open-orders listing succeeded (a failed listing is never read as "no orders"),
-        - every protective stop or non-protective SELL seen on any check has a terminal by-id
+        - every protective stop or non-protective SELL seen on any check is done by its by-id
           status (an order stays tracked across checks, so a later failed or lagging listing
           cannot clear it), and
-        - the signed broker position is verified flat, so a stray order that filled while this
-          check ran and flipped the account short is caught rather than reported as a clean exit.
+        - the signed broker position is verified flat.
+
+        A short position fails at once: a stray SELL filled and polling cannot undo it. A long or
+        unreadable position is retried, since the position endpoint can lag the exit fill.
         """
-        attempts = max(1, self.cancel_poll_attempts)
-        # order id -> (last order object seen, last status seen, whether it is a protective stop)
-        # for open SELLs not yet confirmed terminal. Non-protective SELLs are tracked the same way:
-        # one that stays live could open a short against the now-flat position.
-        unresolved: dict[str, tuple[Any, Optional[str], bool]] = {}
+        attempts = self.cancel_poll_attempts
+        # order id -> (last status seen, whether it is a protective stop) for open SELLs not yet
+        # done. Non-protective SELLs are tracked too: one that stays live could open a short.
+        unresolved: dict[str, tuple[Optional[str], bool]] = {}
         listing_ok = False
-        position_qty: Optional[float] = None
+        last_position_qty: Optional[float] = None
         for attempt in range(1, attempts + 1):
             protective_orders, ambiguous_orders, listing_ok = self._list_open_sell_orders(symbol)
             candidates = dict(unresolved)
             for is_protective, listed in ((True, protective_orders), (False, ambiguous_orders)):
                 for order_id, order in listed.items():
-                    candidates[order_id] = (order, self._status_value(order), is_protective)
+                    candidates[order_id] = (self._status_value(order), is_protective)
             unresolved = {}
-            for order_id, (order, last_status, is_protective) in candidates.items():
-                refreshed = self._refresh_order(order_id, nested=False)
-                status = self._status_value(refreshed) if refreshed is not None else None
-                if status in _EXIT_TERMINAL_STATUSES:
+            for order_id, (last_status, is_protective) in candidates.items():
+                status = self._status_value(self._refresh_order(order_id, nested=False))
+                if status in _TRACKED_ORDER_DONE_STATUSES:
                     continue
-                unresolved[order_id] = (refreshed if refreshed is not None else order, status or last_status, is_protective)
+                unresolved[order_id] = (status or last_status, is_protective)
             if listing_ok and not unresolved:
-                position_qty = self._signed_position_qty(symbol)
-                if position_qty is not None and abs(position_qty) <= 1e-9:
+                last_position_qty = self._signed_position_qty(symbol)
+                if last_position_qty is not None and abs(last_position_qty) <= 1e-9:
                     return {"ok": True, "attempts": attempt, "message": None}
-                if position_qty is not None:
-                    # A tracked order filled after the exit and moved the account off flat; polling
-                    # will not undo that, so report it now.
+                if last_position_qty is not None and last_position_qty < 0.0:
                     return {
                         "ok": False,
                         "attempts": attempt,
                         "message": (
                             f"CRITICAL: broker position for {symbol} is not flat after the exit "
-                            f"(signed quantity {position_qty:g}); an order filled while the exit was being reconciled."
+                            f"(signed quantity {last_position_qty:g}); an order filled while the exit was being reconciled."
                             f"{self._cancelled_note(cancelled_ids)}"
                         ),
                     }
@@ -1345,7 +1369,7 @@ class AlpacaClient:
         def _describe(want_protective: bool) -> list[str]:
             return [
                 f"{order_id} (status {status or 'unknown'})"
-                for order_id, (_, status, is_protective) in sorted(unresolved.items())
+                for order_id, (status, is_protective) in sorted(unresolved.items())
                 if is_protective == want_protective
             ]
 
@@ -1359,7 +1383,10 @@ class AlpacaClient:
         if not listing_ok:
             problems.append(f"open orders for {symbol} could not be listed reliably on the last check")
         if not problems:
-            problems.append(f"broker position for {symbol} could not be verified flat after the exit")
+            if last_position_qty is None:
+                problems.append(f"broker position for {symbol} could not be verified flat after the exit")
+            else:
+                problems.append(f"broker position for {symbol} is not flat after the exit (signed quantity {last_position_qty:g})")
         message = f"CRITICAL: {'; '.join(problems)} after {attempts} checks.{self._cancelled_note(cancelled_ids)}"
         return {"ok": False, "attempts": attempts, "message": message}
 
@@ -1379,13 +1406,7 @@ class AlpacaClient:
             return None
         if position is None:
             return 0.0
-        qty = self._safe_float(getattr(position, "qty", None), None)
-        if qty is None:
-            return None
-        side = self._enum_or_value(getattr(position, "side", None))
-        if side == "short":
-            return -abs(qty)
-        return qty
+        return self._signed_qty_of(position, missing_qty=None)
 
     def _cancel_protective_orders(self, symbol: str, protective_orders: list) -> dict[str, Any]:
         if not protective_orders:
@@ -1691,6 +1712,12 @@ class AlpacaClient:
                     return True
         return False
 
+    @staticmethod
+    def _is_not_found_error(exc: Exception) -> bool:
+        """Whether a broker exception means the requested order or position does not exist."""
+        message = str(exc).lower()
+        return getattr(exc, "status_code", None) == 404 or "not found" in message or "does not exist" in message
+
     def _lookup_order_by_client_id(self, client_order_id: str) -> tuple[Any, bool]:
         """Return (order, reliable). A confirmed "not found" is (None, True); any other failure is (None, False)."""
         client = self._client
@@ -1699,8 +1726,7 @@ class AlpacaClient:
         try:
             order = client.get_order_by_client_id(client_order_id)
         except Exception as exc:
-            status_code = getattr(exc, "status_code", None)
-            if status_code == 404 or "not found" in str(exc).lower():
+            if self._is_not_found_error(exc):
                 return None, True
             return None, False
         if order is None:
@@ -1708,7 +1734,11 @@ class AlpacaClient:
         return order, True
 
     def _is_order_open(self, order_id: str, symbol: str) -> bool:
-        for order in self.list_open_orders(symbol):
+        """Whether ``order_id`` is listed open. A failed listing counts as open (fail closed)."""
+        listed = self._fetch_open_orders(symbol)
+        if listed is None:
+            return True
+        for order in listed:
             for candidate in self._iter_order_candidates(order):
                 if self._order_identifier(candidate) == order_id:
                     return True
