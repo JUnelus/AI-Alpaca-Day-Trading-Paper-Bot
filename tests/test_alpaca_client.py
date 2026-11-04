@@ -1359,3 +1359,460 @@ def test_has_day_protection_detects_expiring_stops_and_raises_on_listing_errors(
         _alpaca(BrokenOrders([]), paper=True).has_day_protection("MSFT")
     with pytest.raises(RuntimeError):
         AlpacaClient(trading_client=None, paper=True).has_day_protection("MSFT")
+
+
+class _LaggingOrderListClient(RecordingTradingClient):
+    """Open-orders listing keeps showing cancelled orders for a while, as Alpaca's can.
+
+    By-id lookups stay authoritative. ``extra_after_sell`` orders appear in the listing (and by-id)
+    only once the SELL has been submitted, modelling a stop the pre-SELL reconciliation never saw.
+    """
+
+    def __init__(self, *args, lagged_listings=0, extra_after_sell=None, unknown_by_id=None, fail_listings_once_extra_seen=False, failing_post_sell_listings=0, listing_failures_once_extra_seen=0, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The next N listing requests made after the SELL is submitted raise.
+        self.failing_post_sell_listings = failing_post_sell_listings
+        # The next N listing requests made once an extra order has been listed raise, then listings recover.
+        self.listing_failures_once_extra_seen = listing_failures_once_extra_seen
+        self.lagged_listings = lagged_listings
+        self.unknown_by_id = set(unknown_by_id or [])
+        # Once an extra order has been listed, every later listing request raises.
+        self.fail_listings_once_extra_seen = fail_listings_once_extra_seen
+        self._extra_ids = {str(getattr(order, "id", "")) for order in (extra_after_sell or [])}
+        self._extra_listed = False
+        self.extra_after_sell = list(extra_after_sell or [])
+        self.get_orders_calls = 0
+
+    def submit_order(self, order):
+        response = super().submit_order(order)
+        for extra in self.extra_after_sell:
+            self._register(extra, include_in_open=True)
+        self.extra_after_sell = []
+        return response
+
+    def get_order_by_id(self, order_id, filter=None):
+        if str(order_id) in self.unknown_by_id:
+            return None
+        return super().get_order_by_id(order_id, filter)
+
+    def get_orders(self, filter=None):
+        self.get_orders_calls += 1
+        if self.fail_listings_once_extra_seen and self._extra_listed:
+            raise RuntimeError("orders endpoint unavailable")
+        if self._extra_listed and self.listing_failures_once_extra_seen > 0:
+            self.listing_failures_once_extra_seen -= 1
+            raise RuntimeError("orders endpoint unavailable")
+        if self.orders and self.failing_post_sell_listings > 0:
+            self.failing_post_sell_listings -= 1
+            raise RuntimeError("orders endpoint unavailable")
+        orders = super().get_orders(filter)
+        if any(str(getattr(order, "id", "")) in self._extra_ids for order in orders):
+            self._extra_listed = True
+        if self.lagged_listings > 0:
+            for order_id in self.cancelled_ids:
+                lagged = self.lookup.get(order_id)
+                if lagged is not None and lagged not in orders:
+                    # The stale listing still reports the status the order had before cancellation.
+                    orders.append(SimpleNamespace(**{**vars(lagged), "status": "new"}))
+            if self.cancelled_ids:
+                self.lagged_listings -= 1
+        return orders
+
+
+def _eod_exit_setup(**client_kwargs):
+    day_stop = _order(id="stop-day", symbol="AAPL", side="sell", qty=0.0105, stop_price=325.75, status="new", time_in_force="day")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=0.0105, filled_qty=0.0105, filled_avg_price=330.93, status="filled", order_class=None, legs=[])
+    client = _LaggingOrderListClient(
+        responses=[sell_order],
+        open_orders=[day_stop],
+        positions=[_order(symbol="AAPL", qty="0.0105", side="long")],
+        **client_kwargs,
+    )
+    client.on_submit = lambda order, response: client.positions.clear()
+    sleeps = []
+    alpaca = AlpacaClient(trading_client=client, sleep_fn=sleeps.append, paper=True)
+    return client, alpaca, sleeps
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_is_not_failed_by_a_listing_that_lags_a_verified_cancellation():
+    # The listing still shows the cancelled stop for longer than the poll budget, but the by-id
+    # lookup reports it cancelled, so the flat position is reconciled instead of flagged stale.
+    client, alpaca, _ = _eod_exit_setup(lagged_listings=50)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert result.success, result.message
+    assert result.protection_reconciled
+    assert not result.protection_failed
+    assert result.cancelled_protective_order_ids == ["stop-day"]
+    assert result.actual_remaining_position_qty == 0.0
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_with_a_genuinely_open_stop_fails_closed_and_names_the_orders():
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    client, alpaca, sleeps = _eod_exit_setup(extra_after_sell=[stray_stop])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert result.status == "protection_failed"
+    assert "stop-stray (status new)" in result.message
+    assert "Cancelled before the SELL: stop-day" in result.message
+    assert f"after {alpaca.cancel_poll_attempts} checks" in result.message
+    # Nothing is cancelled or sold beyond the original reconciliation.
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+    assert "stop-stray" not in client.cancelled_ids
+    assert len(sleeps) >= alpaca.cancel_poll_attempts - 1
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_a_listed_stop_cannot_be_looked_up():
+    unknown_stop = _order(id="stop-unknown", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    # The listing returns the stop, but the by-id lookup finds nothing: that is not proof it is closed.
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[unknown_stop], unknown_by_id=["stop-unknown"])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert not result.success
+    assert result.protection_failed
+    assert "stop-unknown" in result.message
+
+
+@_requires_alpaca_sdk
+def test_full_sell_reconciles_when_only_the_listing_lags_the_cancelled_stop():
+    stop_order = _order(id="stop-1", symbol="AAPL", side="sell", qty=5.0, stop_price=95.0, status="new")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=5.0, filled_qty=5.0, filled_avg_price=101.0, status="filled", order_class=None, legs=[])
+    client = _LaggingOrderListClient(responses=[sell_order], open_orders=[stop_order], lagged_listings=2)
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = alpaca.place_paper_trade(symbol="AAPL", qty=5.0, side="sell", asset_type="stock", mode="trade", current_position_qty=5.0)
+
+    assert result.success, result.message
+    assert result.protection_reconciled
+    assert client.cancelled_ids == ["stop-1"]
+
+
+@_requires_alpaca_sdk
+@pytest.mark.parametrize(
+    "by_id_responses, expected_status",
+    [
+        pytest.param("live", "new", id="stop-still-live-by-id"),
+        pytest.param("unknown", "new", id="stop-unresolvable-by-id"),
+    ],
+)
+def test_eod_exit_keeps_an_observed_stop_unresolved_when_later_listings_fail(by_id_responses, expected_status):
+    # The stop is listed once as open; every later listing errors, which list_open_orders reports
+    # as an empty list. That empty list must not clear a stop that was never confirmed terminal.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(
+        extra_after_sell=[stray_stop],
+        fail_listings_once_extra_seen=True,
+        unknown_by_id=["stop-stray"] if by_id_responses == "unknown" else None,
+    )
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert f"stop-stray (status {expected_status})" in result.message
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_clears_an_observed_stop_only_once_its_by_id_lookup_is_terminal():
+    # Listed open on the first check, then a listing error, then listings recover without it: the
+    # retained stop is refreshed by id and the exit reconciles once that lookup reports it cancelled.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    cancelled_stray = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="canceled", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_stop], listing_failures_once_extra_seen=1)
+    client.order_sequences["stop-stray"] = [stray_stop, cancelled_stray]
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert client.listing_failures_once_extra_seen == 0
+    assert result.success, result.message
+    assert result.protection_reconciled
+    assert not result.protection_failed
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_keeps_an_observed_non_protective_sell_unresolved_when_later_listings_fail():
+    # A non-protective open SELL is seen once after the exit; every later listing errors. It must
+    # stay tracked by id rather than being dropped with the warning, and the exit fails closed.
+    stray_sell = _order(id="sell-stray", symbol="AAPL", side="sell", qty=0.0105, status="new", order_class=None, legs=[])
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_sell], fail_listings_once_extra_seen=True)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert "non-protective open sell order(s) remained after closing AAPL: sell-stray (status new)" in result.message
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_clears_a_lagging_non_protective_sell_once_its_by_id_lookup_is_terminal():
+    # The listing briefly shows a SELL that the by-id lookup then reports filled (for example the
+    # exit order itself lagging in the listing): it is cleared instead of failing the cleanup.
+    lagging_sell = _order(id="sell-lagging", symbol="AAPL", side="sell", qty=0.0105, status="new", order_class=None, legs=[])
+    filled_sell = _order(id="sell-lagging", symbol="AAPL", side="sell", qty=0.0105, status="filled", order_class=None, legs=[])
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[lagging_sell])
+    client.order_sequences["sell-lagging"] = [lagging_sell, filled_sell]
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert result.success, result.message
+    assert result.protection_reconciled
+    assert not result.protection_failed
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_retries_a_failed_first_listing_instead_of_treating_it_as_no_orders():
+    # The first post-exit listing errors (read as an empty list by list_open_orders). The check must
+    # retry rather than reconcile, and the next listing reveals a live stray stop.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_stop], failing_post_sell_listings=1)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client.failing_post_sell_listings == 0
+    assert client._extra_listed
+    assert not result.success
+    assert result.protection_failed
+    assert "stop-stray (status new)" in result.message
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_reconciles_after_a_failed_first_listing_once_a_clean_listing_is_obtained():
+    client, alpaca, _ = _eod_exit_setup(failing_post_sell_listings=1)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client.failing_post_sell_listings == 0
+    assert result.success, result.message
+    assert result.protection_reconciled
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_no_reliable_listing_is_ever_obtained():
+    client, alpaca, _ = _eod_exit_setup(failing_post_sell_listings=10_000)
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert "open orders for AAPL could not be listed reliably" in result.message
+    assert client.cancelled_ids == ["stop-day"]
+    assert len(client.orders) == 1
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_a_stray_fill_flips_the_position_short():
+    # A stray stop is seen open after the exit, then fills while the check polls. Its by-id status is
+    # terminal, but the fill left the account short, so the exit must not be reported as flat.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    filled_stray = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="filled", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_stop])
+    client.order_sequences["stop-stray"] = [stray_stop, filled_stray]
+    by_id = client.get_order_by_id
+
+    def get_order_by_id_with_fill(order_id, filter=None):
+        order = by_id(order_id, filter)
+        if str(order_id) == "stop-stray" and getattr(order, "status", None) == "filled":
+            client.positions[:] = [_order(symbol="AAPL", qty="-0.0105", side="short")]
+        return order
+
+    client.get_order_by_id = get_order_by_id_with_fill
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert not result.success
+    assert result.protection_failed
+    assert not result.protection_reconciled
+    assert "not flat after the exit (signed quantity -0.0105)" in result.message
+
+
+def _with_position_reads(alpaca, reads):
+    """Make the post-exit signed position check return ``reads`` in turn (the last one repeats)."""
+    remaining = list(reads)
+    calls = []
+
+    def signed_position_qty(symbol):
+        calls.append(symbol)
+        return remaining.pop(0) if len(remaining) > 1 else remaining[0]
+
+    alpaca._signed_position_qty = signed_position_qty
+    return calls
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_retries_a_long_position_read_that_lags_the_exit_fill():
+    # The position endpoint briefly still shows the sold long quantity; that is lag, not a stray
+    # fill (a SELL fill can only move the position down), so the check retries and reconciles.
+    client, alpaca, _ = _eod_exit_setup()
+    calls = _with_position_reads(alpaca, [0.0105, 0.0])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert len(calls) == 2
+    assert result.success, result.message
+    assert result.protection_reconciled
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_a_long_position_never_reads_flat():
+    client, alpaca, _ = _eod_exit_setup()
+    calls = _with_position_reads(alpaca, [0.0105])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert len(calls) == alpaca.cancel_poll_attempts
+    assert not result.success
+    assert result.protection_failed
+    assert f"is not flat after the exit (signed quantity 0.0105) after {alpaca.cancel_poll_attempts} checks" in result.message
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_fails_closed_when_the_position_cannot_be_read():
+    client, alpaca, _ = _eod_exit_setup()
+    calls = _with_position_reads(alpaca, [None])
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert len(calls) == alpaca.cancel_poll_attempts
+    assert not result.success
+    assert result.protection_failed
+    assert "broker position for AAPL could not be verified flat after the exit" in result.message
+
+
+@_requires_alpaca_sdk
+def test_eod_exit_treats_a_replaced_order_as_done():
+    # A tracked stop is replaced during the check: its old id can no longer fill, so it is done.
+    stray_stop = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="new", time_in_force="day")
+    replaced_stray = _order(id="stop-stray", symbol="AAPL", side="sell", qty=0.0105, stop_price=320.0, status="replaced", time_in_force="day")
+    client, alpaca, _ = _eod_exit_setup(extra_after_sell=[stray_stop])
+    client.order_sequences["stop-stray"] = [stray_stop, replaced_stray]
+
+    result = alpaca.close_position_for_eod("AAPL", 0.0105, "stock", current_position_qty=0.0105)
+
+    assert client._extra_listed
+    assert result.success, result.message
+    assert result.protection_reconciled
+
+
+def test_signed_position_qty_keeps_shorts_negative_and_reports_unreadable_positions():
+    class Positions:
+        def __init__(self, positions=None, error=None):
+            self.positions = positions or []
+            self.error = error
+
+        def get_open_position(self, symbol):
+            raise self.error or RuntimeError("position not found")
+
+        def get_all_positions(self):
+            if self.error:
+                raise self.error
+            return list(self.positions)
+
+    short = _order(symbol="BTCUSD", qty="-0.5", side="short")
+    assert AlpacaClient(trading_client=Positions([short]), paper=True)._signed_position_qty("BTC/USD") == -0.5
+    assert AlpacaClient(trading_client=Positions([short]), paper=True).get_position_qty("BTC/USD") == 0.0
+    assert AlpacaClient(trading_client=Positions(), paper=True)._signed_position_qty("AAPL") == 0.0
+    unreadable = AlpacaClient(trading_client=Positions(error=RuntimeError("positions endpoint down")), paper=True)
+    assert unreadable._signed_position_qty("AAPL") is None
+    assert unreadable.get_position_qty("AAPL") is None
+    no_qty = AlpacaClient(trading_client=Positions([_order(symbol="BTCUSD", side="long")]), paper=True)
+    assert no_qty._signed_position_qty("BTC/USD") is None
+    assert no_qty.get_position_qty("BTC/USD") == 0.0
+
+
+def test_get_position_skips_the_full_scan_for_a_flat_equity_but_not_for_crypto():
+    class CountingPositions:
+        def __init__(self):
+            self.full_scans = 0
+
+        def get_open_position(self, symbol):
+            raise RuntimeError("position does not exist")
+
+        def get_all_positions(self):
+            self.full_scans += 1
+            return [_order(symbol="BTCUSD", qty="0.1", side="long")]
+
+    client = CountingPositions()
+    alpaca = AlpacaClient(trading_client=client, paper=True)
+
+    assert alpaca.get_position("AAPL") is None
+    assert client.full_scans == 0
+    assert alpaca.get_position("BTC/USD").qty == "0.1"
+    assert client.full_scans == 1
+
+
+@_requires_alpaca_sdk
+def test_sell_is_blocked_when_open_orders_cannot_be_listed_before_the_exit():
+    class BrokenListing(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            raise RuntimeError("orders endpoint unavailable")
+
+    stop_order = _order(id="stop-1", symbol="AAPL", side="sell", qty=5.0, stop_price=95.0, status="new")
+    client = BrokenListing(responses=[], open_orders=[stop_order])
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = alpaca.place_paper_trade(symbol="AAPL", qty=5.0, side="sell", asset_type="stock", mode="trade", current_position_qty=5.0)
+
+    assert not result.success
+    assert result.status == "protection_reconciliation_failed"
+    assert "could not be listed reliably" in result.message
+    assert client.orders == []
+    assert client.cancelled_ids == []
+
+
+@_requires_alpaca_sdk
+def test_is_order_open_counts_a_failed_listing_as_open():
+    class BrokenListing(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            raise RuntimeError("orders endpoint unavailable")
+
+    assert _alpaca(BrokenListing(), paper=True)._is_order_open("stop-1", "AAPL")
+    assert not _alpaca(RecordingTradingClient(), paper=True)._is_order_open("stop-1", "AAPL")
+
+
+@_requires_alpaca_sdk
+def test_partial_sell_fails_closed_when_stacked_stops_cannot_be_ruled_out():
+    class ListingFailsAfterReplacement(RecordingTradingClient):
+        def get_orders(self, filter=None):
+            if len(self.orders) >= 2:
+                raise RuntimeError("orders endpoint unavailable")
+            return super().get_orders(filter)
+
+    old_stop = _order(id="stop-old", symbol="AAPL", side="sell", qty=10.0, stop_price=95.0, status="new")
+    sell_order = _order(id="sell-1", symbol="AAPL", side="sell", qty=4.0, filled_qty=4.0, filled_avg_price=101.0, status="filled", order_class=None, legs=[])
+    replacement_stop = _order(id="stop-new", symbol="AAPL", side="sell", qty=6.0, stop_price=95.0, status="new")
+    client = ListingFailsAfterReplacement(
+        responses=[sell_order, replacement_stop],
+        open_orders=[old_stop],
+        positions=[_order(symbol="AAPL", qty="6", side="long")],
+    )
+    alpaca = _alpaca(client, paper=True, prefer_attached_stops=True)
+
+    result = alpaca.place_paper_trade(symbol="AAPL", qty=4.0, side="sell", asset_type="stock", mode="trade", current_position_qty=10.0)
+
+    assert len(client.orders) == 2
+    assert not result.success
+    assert result.protection_failed
+    assert result.status == "critical_unprotected_position"
+    assert "stacked stops cannot be ruled out" in result.message
